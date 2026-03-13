@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+
+# env files
+.env
+.env.*
+
+# build
+dist/
+
+# generated code
+src/generated/
+
+# macOS
+.DS_Store
+
+# logs
+logs
+*.log
