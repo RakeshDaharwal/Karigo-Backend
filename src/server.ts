@@ -7,13 +7,12 @@ import { env } from "./config/env";
 const PORT = env.port || 5004;
 
 
-
 const startServer = async () => {
   await connectDB();
   await connectRedis();
 
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 };
 

@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { morganRequestLogger } from "./middlewares/morgan";
-import authRoutes from "./routes/web/auth.route";
+import authRoutes from "./modules/auth/routes/auth.route";
 import { errorHandler } from "./middlewares/error.middleware";
 
 
@@ -11,7 +11,7 @@ app.use(morganRequestLogger);
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/auth", authRoutes);
+app.use("/api/v1/auth", authRoutes);
 
 
 
