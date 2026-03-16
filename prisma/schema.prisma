@@ -10,12 +10,24 @@ datasource db {
 
 
 
-model Organization {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
+enum Role {
+  USER
+  SUPER_ADMIN
+  WORKER
+  ADMIN
+}
+
+model User {
+  id                 Int      @id @default(autoincrement())
+  mobile             String   @unique
+  name               String?
+  otpHash            String?
+  otpExpiresAt       DateTime?
+  isVerified         Boolean  @default(false)
+  isProfileCompleted Boolean  @default(false)
+  role               Role     @default(USER)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 
