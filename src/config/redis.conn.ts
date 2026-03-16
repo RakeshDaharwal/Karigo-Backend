@@ -11,9 +11,9 @@ const redis = new Redis({
 export const connectRedis = async () => {
   try {
     await redis.ping();
-    console.log("✅ Redis connected successfully");
+    console.log("Redis connected successfully");
   } catch (error) {
-    console.error("❌ Redis connection failed", error);
+    console.error("Redis connection failed", error);
     process.exit(1);
   }
 };

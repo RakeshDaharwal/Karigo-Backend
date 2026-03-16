@@ -16,6 +16,7 @@ export const validate =
         service,
         event: eventName,
         email: req.body?.email,
+        mobile: req.body?.mobile,
         path: req.path,
         error: result.error.issues[0].message,
       });
