@@ -5,6 +5,9 @@ import { env } from "./env";
 const redis = new Redis({
   host: env.redisHost,
   port: env.redisPort,
+  username: env.redisUsername || undefined,
+  password: env.redisPassword || undefined,
+  db: env.redisDb,
 });
 
 

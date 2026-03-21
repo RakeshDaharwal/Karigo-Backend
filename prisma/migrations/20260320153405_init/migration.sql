@@ -6,8 +6,6 @@ CREATE TABLE "User" (
     "id" SERIAL NOT NULL,
     "mobile" TEXT NOT NULL,
     "name" TEXT,
-    "otpHash" TEXT,
-    "otpExpiresAt" TIMESTAMP(3),
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
     "isProfileCompleted" BOOLEAN NOT NULL DEFAULT false,
     "role" "Role" NOT NULL DEFAULT 'USER',
