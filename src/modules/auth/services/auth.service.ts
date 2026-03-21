@@ -1,13 +1,20 @@
-import bcrypt from "bcrypt";
-import {
-  findUserByMobile,
-  markUserVerified,
-  upsertUserForLogin,
-} from "../repository/repository";
+import { upsertVerifiedUserByMobile } from "../repository/repository";
 import { generateAppAccessToken } from "../../../utils/jwt";
+import { env } from "../../../config/env";
+import {
+  deleteOtpRecord,
+  getOtpRecord,
+  incrementIpOtpLimit,
+  incrementMobileOtpLimit,
+  isOtpCooldownActive,
+  setOtpCooldown,
+  setOtpRecord,
+  updateOtpAttemptsKeepingTtl,
+} from "../helpers/auth.redis";
 
-const OTP_EXPIRY_IN_MS = 5 * 60 * 1000;
-const OTP_BYPASS_CODE = "123456";
+const OTP_MOBILE_LIMIT_MAX = env.otpMobileLimitMax;
+const OTP_IP_LIMIT_MAX = env.otpIpLimitMax;
+const OTP_MAX_ATTEMPTS = env.otpMaxAttempts;
 
 const createError = (message: string, statusCode: number) => {
   const error = new Error(message) as Error & { statusCode: number };
@@ -19,39 +26,73 @@ const generateOtp = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-export const userLoginService = async (mobile: string) => {
-  const otp = generateOtp();
-  const otpHash = await bcrypt.hash(otp, 10);
-  const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_IN_MS);
+export const sendSMS = async (mobile: string, otp: string) => {
+  // Hook your SMS provider here. For high volume, this can be queued via BullMQ.
+  console.log(`Sending OTP ${otp} to mobile ${mobile}`);
+};
 
-  const user = await upsertUserForLogin(mobile, otpHash, otpExpiresAt);
+export const userLoginService = async (mobile: string, ip: string) => {
+  const [mobileRequestCount, ipRequestCount] = await Promise.all([
+    incrementMobileOtpLimit(mobile),
+    incrementIpOtpLimit(ip),
+  ]);
+
+  if (mobileRequestCount > OTP_MOBILE_LIMIT_MAX) {
+    throw createError("Too many OTP requests for this mobile. Try after 1 hour.", 429);
+  }
+
+  if (ipRequestCount > OTP_IP_LIMIT_MAX) {
+    throw createError("Too many OTP requests from this IP. Try after 1 minute.", 429);
+  }
+
+  const cooldownActive = await isOtpCooldownActive(mobile);
+
+  if (cooldownActive) {
+    throw createError("OTP already sent recently. Please wait 30 seconds.", 429);
+  }
+
+  const existingOtp = await getOtpRecord(mobile);
+  const otpToSend = existingOtp?.otp ?? generateOtp();
+
+  if (!existingOtp) {
+    await setOtpRecord(mobile, { otp: otpToSend, attempts: 0 });
+  }
+
+  await sendSMS(mobile, otpToSend);
+  await setOtpCooldown(mobile);
 
   return {
-    mobile: user.mobile,
-    userId: user.id,
-    otp: otp
+    mobile,
+    otpReused: Boolean(existingOtp),
   };
 };
 
 export const verifyOtpService = async (mobile: string, otp: string) => {
-  const user = await findUserByMobile(mobile);
-
-  if (!user || !user.otpHash || !user.otpExpiresAt) {
-    throw createError("OTP not found for this mobile", 400);
+  const otpRecord = await getOtpRecord(mobile);
+  if (!otpRecord) {
+    throw createError("OTP expired or not found", 400);
   }
 
-  if (user.otpExpiresAt.getTime() < Date.now()) {
-    throw createError("OTP expired", 400);
-  }
+  if (otpRecord.otp !== otp) {
+    const updatedAttempts = otpRecord.attempts + 1;
 
-  const isOtpValid =
-    otp === OTP_BYPASS_CODE || (await bcrypt.compare(otp, user.otpHash));
+    if (updatedAttempts >= OTP_MAX_ATTEMPTS) {
+      await deleteOtpRecord(mobile);
+      throw createError("Too many incorrect attempts", 429);
+    }
 
-  if (!isOtpValid) {
+    const otpUpdated = await updateOtpAttemptsKeepingTtl(mobile, updatedAttempts);
+    if (!otpUpdated) {
+      throw createError("OTP expired or not found", 400);
+    }
+
     throw createError("Invalid OTP", 401);
   }
 
-  const verifiedUser = await markUserVerified(user.id);
+  await deleteOtpRecord(mobile);
+
+  // Database is accessed only after OTP validation succeeds.
+  const verifiedUser = await upsertVerifiedUserByMobile(mobile);
   const accessToken = generateAppAccessToken(verifiedUser.id, verifiedUser.role);
 
   return {

@@ -13,16 +13,29 @@ services:
       - "5436:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - karigo_network
 
   redis:
     image: redis:7-alpine
     container_name: karigo_redis
     restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     ports:
       - "6381:6379"
     volumes:
       - redisdata:/data
+    networks:
+      - karigo_network
 
 volumes:
   pgdata:
   redisdata:
+
+networks:
+  karigo_network:

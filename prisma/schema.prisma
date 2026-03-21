@@ -21,8 +21,6 @@ model User {
   id                 Int      @id @default(autoincrement())
   mobile             String   @unique
   name               String?
-  otpHash            String?
-  otpExpiresAt       DateTime?
   isVerified         Boolean  @default(false)
   isProfileCompleted Boolean  @default(false)
   role               Role     @default(USER)

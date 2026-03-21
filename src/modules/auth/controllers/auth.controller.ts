@@ -16,13 +16,16 @@ export const userLogin = async (
 ) => {
   try {
     const { mobile } = req.body;
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
 
-    const loginData = await userLoginService(mobile);
+
+    const loginData = await userLoginService(mobile, ip);
 
     logInfo("User login OTP generated", {
       service: "auth",
       event: "USER_LOGIN_SUCCESS",
       mobile,
+      ip,
       path: req.path,
     });
 
