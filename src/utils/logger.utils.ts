@@ -1,7 +1,6 @@
 
 import winston from 'winston';
 import path from 'path';
-import { env } from '../config/env';
 
 // Allow only a specific level
 const levelFilter = (level: string) =>

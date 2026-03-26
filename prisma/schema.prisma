@@ -20,10 +20,22 @@ enum Role {
 model User {
   id                 Int      @id @default(autoincrement())
   mobile             String   @unique
-  name               String?
+  firstName          String?
+  lastName           String?
+  gender             String?
+  dateOfBirth        DateTime?
+  country            String?
+  state              String?
+  district           String?
+  branch             String? // village / town / area
+  latitude           Float?
+  longitude          Float?
+  profileImage       String? // GCP URL
+
   isVerified         Boolean  @default(false)
   isProfileCompleted Boolean  @default(false)
   role               Role     @default(USER)
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
