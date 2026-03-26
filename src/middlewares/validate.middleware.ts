@@ -1,6 +1,6 @@
 import { ZodType } from "zod";
 import { Request, Response, NextFunction } from "express";
-import { logError } from "../utils/logger";
+import { logError } from "../utils/logger.utils";
 
 export const validate =
   <T>(

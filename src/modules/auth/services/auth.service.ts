@@ -1,5 +1,5 @@
 import { upsertVerifiedUserByMobile } from "../repository/repository";
-import { generateAppAccessToken } from "../../../utils/jwt";
+import { generateAppAccessToken } from "../../../utils/jwt.utils";
 import { env } from "../../../config/env";
 import {
   deleteOtpRecord,
@@ -10,7 +10,7 @@ import {
   setOtpCooldown,
   setOtpRecord,
   updateOtpAttemptsKeepingTtl,
-} from "../helpers/auth.redis";
+} from "../helpers/auth.helper";
 
 const OTP_MOBILE_LIMIT_MAX = env.otpMobileLimitMax;
 const OTP_IP_LIMIT_MAX = env.otpIpLimitMax;
@@ -100,7 +100,6 @@ export const verifyOtpService = async (mobile: string, otp: string) => {
     user: {
       id: verifiedUser.id,
       mobile: verifiedUser.mobile,
-      name: verifiedUser.name,
       role: verifiedUser.role,
       isVerified: verifiedUser.isVerified,
       isProfileCompleted: verifiedUser.isProfileCompleted,

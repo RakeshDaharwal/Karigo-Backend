@@ -26,4 +26,10 @@ export const env = {
     60
   ),
   otpMaxAttempts: toNumber(process.env.OTP_MAX_ATTEMPTS, 5),
+
+  GCP_BUCKET_NAME: process.env.GCP_BUCKET_NAME || "karigo",
+  GCP_KEY_FILE: process.env.GCP_KEY_FILE || "src/data/gcp-key.json",
+
+  GOOGLE_PLACES_KEY: process.env.GOOGLE_PLACES_KEY || "",
+  GOOGLE_GEOCODE_KEY: process.env.GOOGLE_GEOCODE_KEY || "",
 };

@@ -3,7 +3,7 @@ import {
   userLoginService,
   verifyOtpService,
 } from "../services/auth.service";
-import { logError, logInfo } from "../../../utils/logger";
+import { logError, logInfo } from "../../../utils/logger.utils";
 import {
   UserLoginInput,
   VerifyOtpInput,

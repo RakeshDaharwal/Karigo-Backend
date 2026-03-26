@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { logError, logInfo } from "../../../utils/logger";
+import { logError, logInfo } from "../../../utils/logger.utils";
 import {
   createCategoryService,
   deleteCategoryService,
