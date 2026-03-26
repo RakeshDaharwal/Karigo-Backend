@@ -4,18 +4,18 @@ import {
   verifyToken,
 } from "../../../middlewares/auth.middleware";
 import { uploadProfileImage } from "../../../middlewares/upload.middleware";
-import { updateProfile } from "../controllers/user.controller";
-import { updateProfileSchema } from "../validation/user.validation";
+import { uploadProfile } from "../controllers/user.controller";
+import { uploadProfileSchema } from "../validation/user.validation";
 
 
 const router = express.Router();
 
 router.put(
-  "/edit/profile",
+  "/upload/profile",
   verifyToken,
   uploadProfileImage,
-  validate(updateProfileSchema, "UPDATE_PROFILE_VALIDATION_FAILED", "users"),
-  updateProfile
+  validate(uploadProfileSchema, "UPDATE_PROFILE_VALIDATION_FAILED", "users"),
+  uploadProfile
 );
 
 export default router;

@@ -3,21 +3,23 @@ import jwt from "jsonwebtoken";
 import prisma from "../config/db.conn";
 import { Role } from "../generated/prisma/enums";
 
-const createError = (message: string, statusCode: number) => {
-  const error = new Error(message) as Error & { statusCode: number };
-  error.statusCode = statusCode;
-  return error;
-};
-
 const decodeAuthToken = (authorizationHeader?: string) => {
   if (!authorizationHeader || !authorizationHeader.startsWith("Bearer ")) {
-    throw createError("Authorization token is required", 401);
+    const error = new Error("Authorization token is required") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 401;
+    throw error;
   }
 
   const token = authorizationHeader.slice(7).trim();
 
   if (!token) {
-    throw createError("Authorization token is required", 401);
+    const error = new Error("Authorization token is required") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 401;
+    throw error;
   }
 
   return jwt.verify(
@@ -40,7 +42,9 @@ export const verifyToken = async (
     });
 
     if (!user) {
-      throw createError("User not found", 401);
+      const error = new Error("User not found") as Error & { statusCode: number };
+      error.statusCode = 401;
+      throw error;
     }
 
     (req as Request & { user?: { userId: number; role: Role } }).user = {
@@ -54,7 +58,11 @@ export const verifyToken = async (
       error?.name === "TokenExpiredError" ||
       error?.name === "JsonWebTokenError"
     ) {
-      return next(createError("Invalid or expired token", 401));
+      const authError = new Error("Invalid or expired token") as Error & {
+        statusCode: number;
+      };
+      authError.statusCode = 401;
+      return next(authError);
     }
 
     next(error);
@@ -70,11 +78,17 @@ export const requireSuperAdmin = (
   const user = (req as Request & { user?: { userId: number; role: Role } }).user;
 
   if (!user) {
-    return next(createError("Unauthorized", 401));
+    const error = new Error("Unauthorized") as Error & { statusCode: number };
+    error.statusCode = 401;
+    return next(error);
   }
 
   if (user.role !== Role.SUPER_ADMIN) {
-    return next(createError("Access denied. Super admin only", 403));
+    const error = new Error("Access denied. Super admin only") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 403;
+    return next(error);
   }
 
   next();

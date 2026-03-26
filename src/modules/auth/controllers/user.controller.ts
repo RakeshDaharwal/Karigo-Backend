@@ -1,29 +1,25 @@
 import { Request, Response, NextFunction } from "express";
 import { logError, logInfo } from "../../../utils/logger.utils";
-import { updateUserProfileService } from "../services/user.service";
-import { UpdateProfileInput } from "../validation/user.validation";
+import { uploadUserProfileService } from "../services/user.service";
+import { UploadProfileInput } from "../validation/user.validation";
 
-const createError = (message: string, statusCode: number) => {
-  const error = new Error(message) as Error & { statusCode: number };
-  error.statusCode = statusCode;
-  return error;
-};
-
-export const updateProfile = async (
-  req: Request<{}, {}, UpdateProfileInput>,
+export const uploadProfile = async (
+  req: Request<{}, {}, UploadProfileInput>,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const user = (req as Request & { user?: { userId: number } }).user;
     if (!user?.userId) {
-      throw createError("Unauthorized", 401);
+      const error = new Error("Unauthorized") as Error & { statusCode: number };
+      error.statusCode = 401;
+      throw error;
     }
 
     const userId = user.userId;
     const file = req.file;
 
-    const updatedUser = await updateUserProfileService(
+    const updatedUser = await uploadUserProfileService(
       userId,
       req.body,
       file

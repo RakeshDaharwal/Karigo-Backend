@@ -1,23 +1,19 @@
 import prisma from "../../../config/db.conn";
 import { uploadToGCP } from "../../../utils/gcp.utils";
-import { getGeolocation } from "../../../utils/maps.utils";
-import { UpdateProfileInput } from "../validation/user.validation";
+import { getGeoCode } from "../../../utils/maps.utils";
+import { v4 as uuidv4 } from "uuid";
+import { UploadProfileInput } from "../validation/user.validation";
 
-const createError = (message: string, statusCode: number) => {
-  const error = new Error(message) as Error & { statusCode: number };
-  error.statusCode = statusCode;
-  return error;
-};
-
-export const updateUserProfileService = async (
+export const uploadUserProfileService = async (
   userId: number,
-  body: UpdateProfileInput,
+  body: UploadProfileInput,
   file?: Express.Multer.File
 ) => {
   let imageUrl: string | undefined;
 
   if (file) {
-    imageUrl = await uploadToGCP(file);
+    const fileName = `profile/${uuidv4()}-${file.originalname}`;
+    imageUrl = await uploadToGCP(file, fileName);
   }
 
 console.log('imageUrl', imageUrl)
@@ -28,12 +24,19 @@ console.log('imageUrl', imageUrl)
   let latitude: number;
   let longitude: number;
   try {
-    const geo = await getGeolocation(fullAddress);
+    const geo = await getGeoCode(fullAddress);
+
+
+console.log('geo', geo)
     latitude = geo.latitude;
     longitude = geo.longitude;
   } catch (error: any) {
     if (error?.message === "No results from Google Geocoder") {
-      throw createError("Invalid address, location not found", 400);
+      const customError = new Error("Invalid address, location not found") as Error & {
+        statusCode: number;
+      };
+      customError.statusCode = 400;
+      throw customError;
     }
     throw error;
   }

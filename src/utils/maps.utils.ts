@@ -28,13 +28,14 @@ export const searchPlaces = async (query: string) => {
   return { success: true, results };
 };
 
-export const getGeolocation = async (address: string) => {
+
+
+
+
+export const getGeoCode = async (address: string) => {
   if (!GOOGLE_GEOCODE_KEY) {
     throw new Error("GOOGLE_GEOCODE_KEY is not configured");
   }
-
-console.log('GOOGLE_GEOCODE_KEY', GOOGLE_GEOCODE_KEY)
-
 
   const url = "https://maps.googleapis.com/maps/api/geocode/json";
 

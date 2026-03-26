@@ -8,24 +8,24 @@ import {
   updateCategoryById,
 } from "../repository/repository";
 
-const createError = (message: string, statusCode: number) => {
-  const error = new Error(message) as Error & { statusCode: number };
-  error.statusCode = statusCode;
-  return error;
-};
-
 export const createCategoryService = async (name: string) => {
   const existingCategory = await findCategoryByName(name);
 
   if (existingCategory) {
-    throw createError("Category already exists", 409);
+    const error = new Error("Category already exists") as Error & { statusCode: number };
+    error.statusCode = 409;
+    throw error;
   }
 
   try {
     return await createCategory(name);
   } catch (error: any) {
     if (error?.code === "P2002") {
-      throw createError("Category already exists", 409);
+      const customError = new Error("Category already exists") as Error & {
+        statusCode: number;
+      };
+      customError.statusCode = 409;
+      throw customError;
     }
 
     throw error;
@@ -36,20 +36,28 @@ export const updateCategoryService = async (id: number, name: string) => {
   const existingCategory = await findCategoryById(id);
 
   if (!existingCategory) {
-    throw createError("Category not found", 404);
+    const error = new Error("Category not found") as Error & { statusCode: number };
+    error.statusCode = 404;
+    throw error;
   }
 
   const duplicateCategory = await findCategoryByNameExcludingId(name, id);
 
   if (duplicateCategory) {
-    throw createError("Category already exists", 409);
+    const error = new Error("Category already exists") as Error & { statusCode: number };
+    error.statusCode = 409;
+    throw error;
   }
 
   try {
     return await updateCategoryById(id, name);
   } catch (error: any) {
     if (error?.code === "P2002") {
-      throw createError("Category already exists", 409);
+      const customError = new Error("Category already exists") as Error & {
+        statusCode: number;
+      };
+      customError.statusCode = 409;
+      throw customError;
     }
 
     throw error;
@@ -64,7 +72,9 @@ export const deleteCategoryService = async (id: number) => {
   const existingCategory = await findCategoryById(id);
 
   if (!existingCategory) {
-    throw createError("Category not found", 404);
+    const error = new Error("Category not found") as Error & { statusCode: number };
+    error.statusCode = 404;
+    throw error;
   }
 
   return softDeleteCategoryById(id);

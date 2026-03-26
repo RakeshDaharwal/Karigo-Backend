@@ -16,12 +16,6 @@ const OTP_MOBILE_LIMIT_MAX = env.otpMobileLimitMax;
 const OTP_IP_LIMIT_MAX = env.otpIpLimitMax;
 const OTP_MAX_ATTEMPTS = env.otpMaxAttempts;
 
-const createError = (message: string, statusCode: number) => {
-  const error = new Error(message) as Error & { statusCode: number };
-  error.statusCode = statusCode;
-  return error;
-};
-
 const generateOtp = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
@@ -38,17 +32,29 @@ export const userLoginService = async (mobile: string, ip: string) => {
   ]);
 
   if (mobileRequestCount > OTP_MOBILE_LIMIT_MAX) {
-    throw createError("Too many OTP requests for this mobile. Try after 1 hour.", 429);
+    const error = new Error(
+      "Too many OTP requests for this mobile. Try after 1 hour."
+    ) as Error & { statusCode: number };
+    error.statusCode = 429;
+    throw error;
   }
 
   if (ipRequestCount > OTP_IP_LIMIT_MAX) {
-    throw createError("Too many OTP requests from this IP. Try after 1 minute.", 429);
+    const error = new Error("Too many OTP requests from this IP. Try after 1 minute.") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 429;
+    throw error;
   }
 
   const cooldownActive = await isOtpCooldownActive(mobile);
 
   if (cooldownActive) {
-    throw createError("OTP already sent recently. Please wait 30 seconds.", 429);
+    const error = new Error("OTP already sent recently. Please wait 30 seconds.") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 429;
+    throw error;
   }
 
   const existingOtp = await getOtpRecord(mobile);
@@ -70,7 +76,9 @@ export const userLoginService = async (mobile: string, ip: string) => {
 export const verifyOtpService = async (mobile: string, otp: string) => {
   const otpRecord = await getOtpRecord(mobile);
   if (!otpRecord) {
-    throw createError("OTP expired or not found", 400);
+    const error = new Error("OTP expired or not found") as Error & { statusCode: number };
+    error.statusCode = 400;
+    throw error;
   }
 
   if (otpRecord.otp !== otp) {
@@ -78,15 +86,21 @@ export const verifyOtpService = async (mobile: string, otp: string) => {
 
     if (updatedAttempts >= OTP_MAX_ATTEMPTS) {
       await deleteOtpRecord(mobile);
-      throw createError("Too many incorrect attempts", 429);
+      const error = new Error("Too many incorrect attempts") as Error & { statusCode: number };
+      error.statusCode = 429;
+      throw error;
     }
 
     const otpUpdated = await updateOtpAttemptsKeepingTtl(mobile, updatedAttempts);
     if (!otpUpdated) {
-      throw createError("OTP expired or not found", 400);
+      const error = new Error("OTP expired or not found") as Error & { statusCode: number };
+      error.statusCode = 400;
+      throw error;
     }
 
-    throw createError("Invalid OTP", 401);
+    const error = new Error("Invalid OTP") as Error & { statusCode: number };
+    error.statusCode = 401;
+    throw error;
   }
 
   await deleteOtpRecord(mobile);
