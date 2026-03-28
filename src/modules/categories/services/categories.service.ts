@@ -1,3 +1,4 @@
+import { ulid } from "ulid";
 import {
   createCategory,
   findCategoryById,
@@ -18,7 +19,7 @@ export const createCategoryService = async (name: string) => {
   }
 
   try {
-    return await createCategory(name);
+    return await createCategory(ulid(), name);
   } catch (error: any) {
     if (error?.code === "P2002") {
       const customError = new Error("Category already exists") as Error & {
@@ -32,7 +33,7 @@ export const createCategoryService = async (name: string) => {
   }
 };
 
-export const updateCategoryService = async (id: number, name: string) => {
+export const updateCategoryService = async (id: string, name: string) => {
   const existingCategory = await findCategoryById(id);
 
   if (!existingCategory) {
@@ -68,7 +69,7 @@ export const getCategoriesService = async () => {
   return getActiveCategories();
 };
 
-export const deleteCategoryService = async (id: number) => {
+export const deleteCategoryService = async (id: string) => {
   const existingCategory = await findCategoryById(id);
 
   if (!existingCategory) {

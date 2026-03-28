@@ -25,7 +25,19 @@ const decodeAuthToken = (authorizationHeader?: string) => {
   return jwt.verify(
     token,
     process.env.ACCESS_TOKEN_SECRET as string
-  ) as jwt.JwtPayload & { userId: number; role: Role };
+  ) as jwt.JwtPayload & { userId: string | number; role: Role };
+};
+
+const userIdFromDecoded = (
+  decoded: jwt.JwtPayload & { userId?: string | number; role: Role }
+) => {
+  const raw = decoded.userId;
+  if (raw === undefined || raw === null || raw === "") {
+    const error = new Error("Invalid token payload") as Error & { statusCode: number };
+    error.statusCode = 401;
+    throw error;
+  }
+  return String(raw);
 };
 
 export const verifyToken = async (
@@ -35,10 +47,10 @@ export const verifyToken = async (
 ) => {
   try {
     const decoded = decodeAuthToken(req.headers.authorization);
+    const userId = userIdFromDecoded(decoded);
 
-    //  DB user check
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: userId },
     });
 
     if (!user) {
@@ -47,7 +59,7 @@ export const verifyToken = async (
       throw error;
     }
 
-    (req as Request & { user?: { userId: number; role: Role } }).user = {
+    (req as Request & { user?: { userId: string; role: Role } }).user = {
       userId: user.id,
       role: user.role,
     };
@@ -70,21 +82,37 @@ export const verifyToken = async (
 };
 
 
-export const requireSuperAdmin = (
+export const requireSuperAdmin = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const decoded = decodeAuthToken(req.headers.authorization);
+    const userId = userIdFromDecoded(decoded);
 
-    if (decoded.role !== Role.SUPER_ADMIN) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      const error = new Error("User not found") as Error & { statusCode: number };
+      error.statusCode = 401;
+      throw error;
+    }
+
+    if (user.role !== Role.SUPER_ADMIN) {
       const error = new Error("Access denied. Super admin only") as Error & {
         statusCode: number;
       };
       error.statusCode = 403;
       return next(error);
     }
+
+    (req as Request & { user?: { userId: string; role: Role } }).user = {
+      userId: user.id,
+      role: user.role,
+    };
 
     next();
   } catch (error: any) {

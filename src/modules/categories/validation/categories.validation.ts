@@ -19,7 +19,12 @@ export const updateCategorySchema = z.object({
 });
 
 export const categoryIdSchema = z.object({
-  id: z.coerce.number().int().positive("Category id must be a positive number"),
+  id: z.string().refine(
+    (v) =>
+      /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(v) ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
+    "Category id must be a valid id"
+  ),
 });
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;

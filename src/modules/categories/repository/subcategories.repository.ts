@@ -1,7 +1,7 @@
 import prisma from "../../../config/db.conn";
 
 export const findSubCategoryByNameAndCategoryId = (
-  categoryId: number,
+  categoryId: string,
   name: string
 ) => {
   return prisma.subCategory.findFirst({
@@ -16,11 +16,24 @@ export const findSubCategoryByNameAndCategoryId = (
   });
 };
 
-export const createSubCategory = (categoryId: number, name: string) => {
+export const createSubCategory = (id: string, categoryId: string, name: string) => {
   return prisma.subCategory.create({
     data: {
+      id,
       categoryId,
       name,
+    },
+  });
+};
+
+export const findSubCategoriesByCategoryId = (categoryId: string) => {
+  return prisma.subCategory.findMany({
+    where: {
+      categoryId,
+      deletedAt: null,
+    },
+    orderBy: {
+      name: "asc",
     },
   });
 };

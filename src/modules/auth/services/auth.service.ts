@@ -1,3 +1,4 @@
+import { ulid } from "ulid";
 import { findUserByMobile, upsertVerifiedUserByMobile } from "../repository/user.repository";
 import { generateAppAccessToken } from "../../../utils/jwt.utils";
 import { env } from "../../../config/env";
@@ -107,18 +108,12 @@ export const verifyOtpService = async (mobile: string, otp: string) => {
   await deleteOtpRecord(mobile);
 
   // Database is accessed only after OTP validation succeeds.
-  const verifiedUser = await upsertVerifiedUserByMobile(mobile);
+  const verifiedUser = await upsertVerifiedUserByMobile(mobile, ulid());
   const accessToken = generateAppAccessToken(verifiedUser.id, verifiedUser.role);
 
   return {
     accessToken,
-    user: {
-      id: verifiedUser.id,
-      mobile: verifiedUser.mobile,
-      role: verifiedUser.role,
-      isVerified: verifiedUser.isVerified,
-      isProfileCompleted: verifiedUser.isProfileCompleted,
-    },
+    user: verifiedUser,
   };
 };
 

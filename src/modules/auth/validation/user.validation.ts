@@ -15,7 +15,16 @@ export const uploadProfileSchema = z.object({
     .string()
     .transform(removeWhitespace)
     .pipe(z.string().min(1, "Gender is required")),
-  dateOfBirth: z.string().transform(removeWhitespace).optional(),
+  dateOfBirth: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null) {
+        return undefined;
+      }
+      const t = removeWhitespace(String(val));
+      return t === "" ? undefined : t;
+    },
+    z.string().optional()
+  ),
   country: z
     .string()
     .transform(removeWhitespace)
@@ -35,3 +44,29 @@ export const uploadProfileSchema = z.object({
 });
 
 export type UploadProfileInput = z.infer<typeof uploadProfileSchema>;
+
+export const joinProfessionalSchema = z.object({
+  categoryId: z
+    .string()
+    .transform(removeWhitespace)
+    .pipe(z.string().min(1, "Category is required")),
+  subCategoryIds: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null) {
+        return [];
+      }
+      if (typeof val === "string") {
+        try {
+          const parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return val;
+    },
+    z.array(z.string().min(1)).min(1, "Select at least one skill")
+  ),
+});
+
+export type JoinProfessionalInput = z.infer<typeof joinProfessionalSchema>;

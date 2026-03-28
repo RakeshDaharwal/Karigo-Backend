@@ -3,10 +3,9 @@ import { validate } from "../../../middlewares/validate.middleware";
 import {
   verifyToken,
 } from "../../../middlewares/auth.middleware";
-import { uploadProfileImage } from "../../../middlewares/upload.middleware";
-import { editProfile } from "../controllers/user.controller";
-import { uploadProfileSchema } from "../validation/user.validation";
-
+import { uploadAadhaarImage, uploadProfileImage } from "../../../middlewares/upload.middleware";
+import { editProfile, joinKarigoAsProfessional } from "../controllers/user.controller";
+import { joinProfessionalSchema, uploadProfileSchema } from "../validation/user.validation";
 
 const router = express.Router();
 
@@ -16,6 +15,14 @@ router.put(
   uploadProfileImage,
   validate(uploadProfileSchema, "UPDATE_PROFILE_VALIDATION_FAILED", "users"),
   editProfile
+);
+
+router.post(
+  "/join/professional",
+  verifyToken,
+  uploadAadhaarImage,
+  validate(joinProfessionalSchema, "JOIN_PROFESSIONAL_VALIDATION_FAILED", "users"),
+  joinKarigoAsProfessional
 );
 
 export default router;

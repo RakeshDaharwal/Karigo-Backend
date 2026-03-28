@@ -1,11 +1,13 @@
+import { ulid } from "ulid";
 import { findCategoryById } from "../repository/repository";
 import {
   createSubCategory,
   findSubCategoryByNameAndCategoryId,
+  findSubCategoriesByCategoryId,
 } from "../repository/subcategories.repository";
 
 export const createSubCategoryService = async (
-  categoryId: number,
+  categoryId: string,
   name: string
 ) => {
   const existingCategory = await findCategoryById(categoryId);
@@ -30,7 +32,7 @@ export const createSubCategoryService = async (
   }
 
   try {
-    return await createSubCategory(categoryId, name);
+    return await createSubCategory(ulid(), categoryId, name);
   } catch (error: any) {
     if (error?.code === "P2002") {
       const customError = new Error("Subcategory already exists") as Error & {
@@ -42,4 +44,16 @@ export const createSubCategoryService = async (
 
     throw error;
   }
+};
+
+export const getSubCategoriesByCategoryIdService = async (categoryId: string) => {
+  const category = await findCategoryById(categoryId);
+
+  if (!category) {
+    const error = new Error("Category not found") as Error & { statusCode: number };
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return findSubCategoriesByCategoryId(categoryId);
 };
