@@ -15,6 +15,7 @@ import {
   updateCategorySchema,
 } from "../validation/categories.validation";
 
+
 const router = express.Router();
 
 router.post(
@@ -27,6 +28,7 @@ router.post(
   ),
   createCategory
 );
+
 
 router.put(
   "/edit/:id",

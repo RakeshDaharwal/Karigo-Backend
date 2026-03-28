@@ -1,6 +1,12 @@
 import prisma from "../../../config/db.conn";
 
 
+export const findUserByMobile = (mobile: string) => {
+  return prisma.user.findUnique({
+    where: { mobile },
+  });
+};
+
 export const upsertVerifiedUserByMobile = (mobile: string) => {
   return prisma.user.upsert({
     where: { mobile },

@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { logError, logInfo } from "../../../utils/logger.utils";
-import { uploadUserProfileService } from "../services/user.service";
+import { editUserProfileService } from "../services/user.service";
 import { UploadProfileInput } from "../validation/user.validation";
 
-export const uploadProfile = async (
+export const editProfile = async (
   req: Request<{}, {}, UploadProfileInput>,
   res: Response,
   next: NextFunction
@@ -19,7 +19,7 @@ export const uploadProfile = async (
     const userId = user.userId;
     const file = req.file;
 
-    const updatedUser = await uploadUserProfileService(
+    const updatedUser = await editUserProfileService(
       userId,
       req.body,
       file
