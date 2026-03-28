@@ -12,15 +12,16 @@ export const findCategoryByName = (name: string) => {
   });
 };
 
-export const createCategory = (name: string) => {
+export const createCategory = (id: string, name: string) => {
   return prisma.category.create({
     data: {
+      id,
       name,
     },
   });
 };
 
-export const findCategoryById = (id: number) => {
+export const findCategoryById = (id: string) => {
   return prisma.category.findFirst({
     where: {
       id,
@@ -29,7 +30,7 @@ export const findCategoryById = (id: number) => {
   });
 };
 
-export const findCategoryByNameExcludingId = (name: string, id: number) => {
+export const findCategoryByNameExcludingId = (name: string, id: string) => {
   return prisma.category.findFirst({
     where: {
       name: {
@@ -44,7 +45,7 @@ export const findCategoryByNameExcludingId = (name: string, id: number) => {
   });
 };
 
-export const updateCategoryById = (id: number, name: string) => {
+export const updateCategoryById = (id: string, name: string) => {
   return prisma.category.update({
     where: {
       id,
@@ -66,7 +67,7 @@ export const getActiveCategories = () => {
   });
 };
 
-export const softDeleteCategoryById = (id: number) => {
+export const softDeleteCategoryById = (id: string) => {
   return prisma.category.update({
     where: {
       id,

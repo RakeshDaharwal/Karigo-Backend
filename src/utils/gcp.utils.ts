@@ -1,5 +1,4 @@
 import { Storage } from "@google-cloud/storage";
-import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { env } from "../config/env";
 
@@ -10,9 +9,10 @@ const storage = new Storage({
 const bucketName = env.GCP_BUCKET_NAME.trim() || "karigo";
 const bucket = storage.bucket(bucketName);
 
-export const uploadToGCP = async (file: Express.Multer.File) => {
-  const fileName = `profile/${uuidv4()}-${file.originalname}`;
-
+export const uploadToGCP = async (
+  file: Express.Multer.File,
+  fileName: string
+) => {
   const blob = bucket.file(fileName);
 
   const blobStream = blob.createWriteStream({

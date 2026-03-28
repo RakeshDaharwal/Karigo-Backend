@@ -12,12 +12,6 @@ import {
   UpdateCategoryInput,
 } from "../validation/categories.validation";
 
-const createError = (message: string, statusCode: number) => {
-  const error = new Error(message) as Error & { statusCode: number };
-  error.statusCode = statusCode;
-  return error;
-};
-
 export const createCategory = async (
   req: Request<{}, {}, CreateCategoryInput>,
   res: Response,
@@ -62,7 +56,11 @@ export const updateCategory = async (
   try {
     const parsedCategoryId = categoryIdSchema.safeParse({ id: req.params.id });
     if (!parsedCategoryId.success) {
-      throw createError(parsedCategoryId.error.issues[0].message, 400);
+      const error = new Error(parsedCategoryId.error.issues[0].message) as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 400;
+      throw error;
     }
 
     const categoryId = parsedCategoryId.data.id;
@@ -137,7 +135,11 @@ export const deleteCategory = async (
   try {
     const parsedCategoryId = categoryIdSchema.safeParse({ id: req.params.id });
     if (!parsedCategoryId.success) {
-      throw createError(parsedCategoryId.error.issues[0].message, 400);
+      const error = new Error(parsedCategoryId.error.issues[0].message) as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 400;
+      throw error;
     }
 
     const categoryId = parsedCategoryId.data.id;
