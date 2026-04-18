@@ -7,6 +7,7 @@ import categoriesRoutes from "./modules/categories/routes/categories.route";
 import subCategoriesRoutes from "./modules/categories/routes/subcategories.route";
 import adminRoutes from "./modules/auth/routes/admin.route";
 import workersRoutes from "./modules/workers/routes/workers.route";
+import chatRoutes from "./modules/chat/routes/chat.route";
 import { errorHandler } from "./middlewares/error.middleware";
 
 
@@ -22,6 +23,7 @@ app.use("/api/v1/categories", categoriesRoutes);
 app.use("/api/v1/subcategories", subCategoriesRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/workers", workersRoutes);
+app.use("/api/v1/chat", chatRoutes);
 
 
 app.use((req, res) => {

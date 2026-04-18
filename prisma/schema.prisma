@@ -40,6 +40,7 @@ model User {
   updatedAt        DateTime @updatedAt
 
   workers Worker[]
+  chatRooms ChatRoom[]
 }
 
 model Category {
@@ -86,8 +87,38 @@ model Worker {
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category @relation(fields: [categoryId], references: [id])
+  chatRooms ChatRoom[]
 
   @@index([userId])
   @@index([categoryId])
   @@map("worker")
+}
+
+model ChatRoom {
+  id        String   @id
+  userId    String
+  workerId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@unique([userId, workerId])
+  @@index([userId])
+  @@index([workerId])
+}
+
+model ChatMessage {
+  id        String   @id
+  roomId    String
+  senderId  String
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
 }
