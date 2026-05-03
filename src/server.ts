@@ -6,7 +6,7 @@ import { connectRedis } from "./config/redis.conn";
 import { env } from "./config/env";
 import http from "http";
 import { Server } from "socket.io";
-import { handleSocketConnection } from "./modules/chat/chat.socket";
+import { handleSocketConnection } from "./app/socket/chat.socket";
 
 const PORT = env.port || 5004;
 

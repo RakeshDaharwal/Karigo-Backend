@@ -30,7 +30,7 @@ model User {
   branch             String? // village / town / area
   latitude           Float?
   longitude          Float?
-  profileImage       String? // GCP URL
+  profileImage       String? // optional public image URL
 
   isVerified         Boolean  @default(false)
   isProfileCompleted Boolean  @default(false)

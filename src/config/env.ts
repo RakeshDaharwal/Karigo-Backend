@@ -27,9 +27,22 @@ export const env = {
   ),
   otpMaxAttempts: toNumber(process.env.OTP_MAX_ATTEMPTS, 5),
 
-  GCP_BUCKET_NAME: process.env.GCP_BUCKET_NAME || "karigo",
-  GCP_KEY_FILE: process.env.GCP_KEY_FILE || "src/data/gcp-key.json",
-
   GOOGLE_PLACES_KEY: process.env.GOOGLE_PLACES_KEY || "",
   GOOGLE_GEOCODE_KEY: process.env.GOOGLE_GEOCODE_KEY || "",
+
+  rateLimitChatWindowSeconds: toNumber(
+    process.env.RATE_LIMIT_CHAT_WINDOW_SECONDS,
+    900
+  ),
+  rateLimitChatMax: toNumber(process.env.RATE_LIMIT_CHAT_MAX, 300),
+  rateLimitCategoriesWindowSeconds: toNumber(
+    process.env.RATE_LIMIT_CATEGORIES_WINDOW_SECONDS,
+    900
+  ),
+  rateLimitCategoriesMax: toNumber(process.env.RATE_LIMIT_CATEGORIES_MAX, 200),
+  rateLimitWorkersWindowSeconds: toNumber(
+    process.env.RATE_LIMIT_WORKERS_WINDOW_SECONDS,
+    900
+  ),
+  rateLimitWorkersMax: toNumber(process.env.RATE_LIMIT_WORKERS_MAX, 120),
 };
