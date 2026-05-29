@@ -1,5 +1,5 @@
 import prisma from "../../config/db.conn";
-import { findCategoryById } from "../../shared/category.repository";
+import { findCategoryById } from "../../repositories/category.repository";
 
 const NEARBY_RADIUS_KM = 5;
 

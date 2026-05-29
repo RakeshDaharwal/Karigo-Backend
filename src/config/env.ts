@@ -27,8 +27,12 @@ export const env = {
   ),
   otpMaxAttempts: toNumber(process.env.OTP_MAX_ATTEMPTS, 5),
 
-  GOOGLE_PLACES_KEY: process.env.GOOGLE_PLACES_KEY || "",
-  GOOGLE_GEOCODE_KEY: process.env.GOOGLE_GEOCODE_KEY || "",
+  GEOAPIFY_API_KEY: process.env.GEOAPIFY_API_KEY || "",
+
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
+  cloudinaryUploadFolder: process.env.CLOUDINARY_UPLOAD_FOLDER || "karigo",
 
   rateLimitChatWindowSeconds: toNumber(
     process.env.RATE_LIMIT_CHAT_WINDOW_SECONDS,

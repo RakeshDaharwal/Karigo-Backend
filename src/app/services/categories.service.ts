@@ -1,8 +1,8 @@
 import {
   findCategoryById,
   getActiveCategories,
-} from "../../shared/category.repository";
-import { findSubCategoriesByCategoryId } from "../../shared/subcategory.repository";
+} from "../../repositories/category.repository";
+import { findSubCategoriesByCategoryId } from "../../repositories/subcategory.repository";
 
 export const getCategoriesService = async () => {
   return getActiveCategories();

@@ -1,67 +1,90 @@
-import multer, { FileFilterCallback } from "multer";
-import { Request } from "express";
+import multer, { FileFilterCallback, MulterError } from "multer";
+import { Request, Response, NextFunction, RequestHandler } from "express";
 
-// ================================
-// STORAGE (in-memory)
-// ================================
 const storage = multer.memoryStorage();
 
-// ================================
-// CONSTANTS
-// ================================
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
-const PROFILE_ALLOWED_TYPES = [
+const IMAGE_ALLOWED_TYPES = [
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/webp",
 ];
 
-const AADHAAR_ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/png",
-];
-
-// ================================
-// GENERIC FILE FILTER CREATOR
-// ================================
 const createFileFilter =
   (allowedTypes: string[]) =>
-  (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-    if (!allowedTypes.includes(file.mimetype)) {
-      return cb(
-        new Error(
-          `Invalid file type. Allowed: ${allowedTypes.join(", ")}`
-        )
-      );
+  (_req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+    if (!allowedTypes.includes(file.mimetype.toLowerCase())) {
+      const err = new Error(
+        "Invalid file type. Allowed: JPG, JPEG, PNG, WEBP",
+      ) as Error & { code: string };
+      err.code = "LIMIT_UNEXPECTED_FILE_TYPE";
+      return cb(err);
     }
     cb(null, true);
   };
 
-// ================================
-// MULTER INSTANCES
-// ================================
-
-// Profile image uploader
-const profileUpload = multer({
+const baseUploader = multer({
   storage,
   limits: { fileSize: MAX_FILE_SIZE_BYTES },
-  fileFilter: createFileFilter(PROFILE_ALLOWED_TYPES),
+  fileFilter: createFileFilter(IMAGE_ALLOWED_TYPES),
 });
 
-// Aadhaar image uploader (stricter)
-const aadhaarUpload = multer({
-  storage,
-  limits: { fileSize: MAX_FILE_SIZE_BYTES },
-  fileFilter: createFileFilter(AADHAAR_ALLOWED_TYPES),
-});
+// Wrap multer middleware so size/type errors come back as 400 JSON
+// instead of bubbling up as a 500 from the global error handler.
+const withUploadErrorHandler =
+  (uploader: RequestHandler, label: string): RequestHandler =>
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log(`[upload:${label}] incoming`, {
+      contentType: req.headers["content-type"],
+      contentLength: req.headers["content-length"],
+    });
 
-// ================================
-// EXPORTED MIDDLEWARES
-// ================================
+    uploader(req, res, (err: any) => {
+      if (err) {
+        console.warn(`[upload:${label}] multer error`, {
+          name: err?.name,
+          code: err?.code,
+          message: err?.message,
+        });
 
-// Single file upload (profile)
-export const uploadProfileImage = profileUpload.single("image");
+        let message = err.message || "Upload failed";
+        if (err instanceof MulterError) {
+          if (err.code === "LIMIT_FILE_SIZE") {
+            message = "File too large. Max 5 MB.";
+          } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+            message = "Unexpected file field";
+          }
+        }
 
-// Single file upload (aadhaar)
-export const uploadAadhaarImage = aadhaarUpload.single("aadhaarImage");
+        return res.status(400).json({
+          success: false,
+          statusCode: 400,
+          message,
+        });
+      }
+
+      const f = (req as any).file as Express.Multer.File | undefined;
+      console.log(`[upload:${label}] parsed`, {
+        hasFile: Boolean(f),
+        fieldname: f?.fieldname,
+        originalname: f?.originalname,
+        mimetype: f?.mimetype,
+        size: f?.size,
+        bodyKeys: Object.keys(req.body || {}),
+      });
+
+      next();
+    });
+  };
+
+export const uploadProfileImage = withUploadErrorHandler(
+  baseUploader.single("image"),
+  "profile",
+);
+
+export const uploadAadhaarImage = withUploadErrorHandler(
+  baseUploader.single("aadhaarImage"),
+  "aadhaar",
+);

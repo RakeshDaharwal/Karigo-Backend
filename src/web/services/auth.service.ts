@@ -1,7 +1,8 @@
+import prisma from "../../config/db.conn";
 import { generateAppAccessToken } from "../../utils/jwt.utils";
 import { env } from "../../config/env";
 import { Role } from "../../generated/prisma/enums";
-import { findUserByMobile } from "../../shared/user.repository";
+import { findUserByMobile } from "../../repositories/user.repository";
 import {
   deleteOtpRecord,
   getOtpRecord,
@@ -11,7 +12,7 @@ import {
   setOtpCooldown,
   setOtpRecord,
   updateOtpAttemptsKeepingTtl,
-} from "../../shared/auth.helper";
+} from "../helpers/auth.helper";
 
 const OTP_MOBILE_LIMIT_MAX = env.otpMobileLimitMax;
 const OTP_IP_LIMIT_MAX = env.otpIpLimitMax;
@@ -28,7 +29,15 @@ export const sendSMS = async (mobile: string, otp: string) => {
 export const superAdminLoginService = async (mobile: string, ip: string) => {
   const superAdminUser = await findUserByMobile(mobile);
 
-  if (!superAdminUser || superAdminUser.role !== Role.SUPER_ADMIN) {
+  if (!superAdminUser) {
+    const error = new Error("Mobile number not registered. Please register first.") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (superAdminUser.role !== Role.SUPER_ADMIN) {
     const error = new Error("Access denied. Super admin only") as Error & {
       statusCode: number;
     };
@@ -117,7 +126,15 @@ export const verifySuperAdminOtpService = async (mobile: string, otp: string) =>
 
   const superAdminUser = await findUserByMobile(mobile);
 
-  if (!superAdminUser || superAdminUser.role !== Role.SUPER_ADMIN) {
+  if (!superAdminUser) {
+    const error = new Error("Mobile number not registered. Please register first.") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (superAdminUser.role !== Role.SUPER_ADMIN) {
     const error = new Error("Access denied. Super admin only") as Error & {
       statusCode: number;
     };
@@ -133,8 +150,35 @@ export const verifySuperAdminOtpService = async (mobile: string, otp: string) =>
       id: superAdminUser.id,
       mobile: superAdminUser.mobile,
       role: superAdminUser.role,
+      firstName: superAdminUser.firstName,
+      lastName: superAdminUser.lastName,
+      profileImage: superAdminUser.profileImage,
       isVerified: superAdminUser.isVerified,
       isProfileCompleted: superAdminUser.isProfileCompleted,
     },
   };
+};
+
+export const getSuperAdminProfileService = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      mobile: true,
+      role: true,
+      firstName: true,
+      lastName: true,
+      profileImage: true,
+      isVerified: true,
+      isProfileCompleted: true,
+    },
+  });
+
+  if (!user) {
+    const err = new Error("User not found") as Error & { statusCode: number };
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return user;
 };

@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import { superAdminLoginService, verifySuperAdminOtpService } from "../services/auth.service";
+import {
+  getSuperAdminProfileService,
+  superAdminLoginService,
+  verifySuperAdminOtpService,
+} from "../services/auth.service";
 import { logError, logInfo } from "../../utils/logger.utils";
 import {
   SuperAdminLoginInput,
@@ -36,6 +40,40 @@ export const superAdminLogin = async (
       service: "auth",
       event: "SUPER_ADMIN_LOGIN_FAILED",
       mobile: req.body?.mobile,
+      path: req.path,
+      error: error.message,
+    });
+
+    next(error);
+  }
+};
+
+export const getSuperAdminMe = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as Request & { user?: { userId: string } }).user;
+    if (!user?.userId) {
+      const err = new Error("Unauthorized") as Error & { statusCode: number };
+      err.statusCode = 401;
+      throw err;
+    }
+
+    const data = await getSuperAdminProfileService(user.userId);
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Profile fetched successfully",
+      data,
+    });
+  } catch (error: any) {
+    logError("Super admin profile fetch failed", {
+      service: "auth",
+      event: "GET_SUPER_ADMIN_ME_FAILED",
+      userId: (req as any)?.user?.userId,
       path: req.path,
       error: error.message,
     });

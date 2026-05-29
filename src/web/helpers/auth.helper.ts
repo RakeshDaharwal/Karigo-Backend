@@ -1,5 +1,5 @@
-import redis from "../config/redis.conn";
-import { env } from "../config/env";
+import redis from "../../config/redis.conn";
+import { env } from "../../config/env";
 
 const OTP_TTL_SECONDS = env.otpTtlSeconds;
 const OTP_COOLDOWN_SECONDS = env.otpCooldownSeconds;

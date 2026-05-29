@@ -1,5 +1,5 @@
 import { ulid } from "ulid";
-import { findUserByMobile, upsertVerifiedUserByMobile } from "../../shared/user.repository";
+import { findUserByMobile, upsertVerifiedUserByMobile } from "../../repositories/user.repository";
 import { generateAppAccessToken } from "../../utils/jwt.utils";
 import { env } from "../../config/env";
 import {
@@ -11,7 +11,7 @@ import {
   setOtpCooldown,
   setOtpRecord,
   updateOtpAttemptsKeepingTtl,
-} from "../../shared/auth.helper";
+} from "../../web/helpers/auth.helper";
 
 const OTP_MOBILE_LIMIT_MAX = env.otpMobileLimitMax;
 const OTP_IP_LIMIT_MAX = env.otpIpLimitMax;

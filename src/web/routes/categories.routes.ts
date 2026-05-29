@@ -6,15 +6,22 @@ import {
   createCategory,
   createSubCategory,
   deleteCategory,
+  deleteSubCategory,
+  listCategories,
+  listSubCategoriesByCategoryId,
   updateCategory,
+  updateSubCategory,
 } from "../controllers/categories.controller";
 import {
   createCategorySchema,
   createSubCategorySchema,
   updateCategorySchema,
+  updateSubCategorySchema,
 } from "../validation/categories.validation";
 
 const router = express.Router();
+
+router.get("/all", categoriesRateLimit, requireSuperAdmin, listCategories);
 
 router.post(
   "/create",
@@ -36,6 +43,13 @@ router.delete("/delete/:id", categoriesRateLimit, requireSuperAdmin, deleteCateg
 
 export const subcategoriesRoutes = express.Router();
 
+subcategoriesRoutes.get(
+  "/by-category/:categoryId",
+  categoriesRateLimit,
+  requireSuperAdmin,
+  listSubCategoriesByCategoryId
+);
+
 subcategoriesRoutes.post(
   "/create",
   categoriesRateLimit,
@@ -46,6 +60,25 @@ subcategoriesRoutes.post(
     "categories"
   ),
   createSubCategory
+);
+
+subcategoriesRoutes.put(
+  "/edit/:id",
+  categoriesRateLimit,
+  requireSuperAdmin,
+  validate(
+    updateSubCategorySchema,
+    "UPDATE_SUBCATEGORY_VALIDATION_FAILED",
+    "categories"
+  ),
+  updateSubCategory
+);
+
+subcategoriesRoutes.delete(
+  "/delete/:id",
+  categoriesRateLimit,
+  requireSuperAdmin,
+  deleteSubCategory
 );
 
 export default router;

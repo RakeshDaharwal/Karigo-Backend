@@ -2,13 +2,31 @@ import express from "express";
 import { validate } from "../../middlewares/validate.middleware";
 import { verifyToken } from "../../middlewares/auth.middleware";
 import { uploadAadhaarImage, uploadProfileImage } from "../../middlewares/upload.middleware";
-import { editProfile, joinKarigoAsProfessional } from "../controllers/users.controller";
+import {
+  editProfile,
+  getMyProfessional,
+  joinKarigoAsProfessional,
+  searchPlacesAutocomplete,
+  updateBranch,
+} from "../controllers/users.controller";
 import {
   joinProfessionalSchema,
+  updateBranchSchema,
   uploadProfileSchema,
 } from "../validation/user.validation";
 
 const router = express.Router();
+
+router.get("/places/autocomplete", verifyToken, searchPlacesAutocomplete);
+
+router.get("/me/professional", verifyToken, getMyProfessional);
+
+router.put(
+  "/branch",
+  verifyToken,
+  validate(updateBranchSchema, "UPDATE_BRANCH_VALIDATION_FAILED", "users"),
+  updateBranch
+);
 
 router.put(
   "/edit/profile",

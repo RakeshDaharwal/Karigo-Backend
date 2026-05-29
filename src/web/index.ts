@@ -4,6 +4,7 @@ import workerRoutes from "./routes/worker.routes";
 import categoriesRoutes, {
   subcategoriesRoutes,
 } from "./routes/categories.routes";
+import analyticsRoutes from "./routes/analytics.routes";
 
 const router = Router();
 
@@ -11,5 +12,6 @@ router.use("/auth", authRoutes);
 router.use("/worker", workerRoutes);
 router.use("/categories", categoriesRoutes);
 router.use("/subcategories", subcategoriesRoutes);
+router.use("/analytics", analyticsRoutes);
 
 export default router;
