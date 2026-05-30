@@ -55,6 +55,7 @@ export const editUserProfileService = async (
       firstName: body.firstName,
       lastName: body.lastName,
       gender: body.gender,
+      dateOfBirth: body.dateOfBirth ?? null,
       profileImage: imageUrl,
       isProfileCompleted: true,
     },
@@ -145,6 +146,17 @@ export const joinKarigoProfessionalService = async (
     throw err;
   }
 
+  const { latitude: branchLat, longitude: branchLng } = branchCoordsFromDetails(
+    dbUser.branchDetails
+  );
+  if (branchLat == null || branchLng == null) {
+    const err = new Error(
+      "Please select your branch before submitting"
+    ) as Error & { statusCode: number };
+    err.statusCode = 400;
+    throw err;
+  }
+
   const category = await findCategoryById(categoryId);
   if (!category) {
     const err = new Error("Category not found") as Error & { statusCode: number };
@@ -198,7 +210,6 @@ export const joinKarigoProfessionalService = async (
     typeof (branchDetails as Record<string, unknown>).name === "string"
       ? String((branchDetails as Record<string, unknown>).name)
       : null;
-  const { latitude, longitude } = branchCoordsFromDetails(branchDetails);
 
   return prisma.worker.create({
     data: {
@@ -210,8 +221,8 @@ export const joinKarigoProfessionalService = async (
       gender: dbUser.gender,
       dateOfBirth: dbUser.dateOfBirth,
       branch: branchName,
-      latitude,
-      longitude,
+      latitude: branchLat,
+      longitude: branchLng,
       profileImage: dbUser.profileImage ?? null,
       categoryId,
       aadhaarImageUrl,

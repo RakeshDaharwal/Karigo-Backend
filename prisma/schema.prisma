@@ -22,6 +22,25 @@ enum PartnerType {
   BUSINESS
 }
 
+enum ShopCategory {
+  FOOD
+  GROCERY
+  HARDWARE
+  PHARMACY
+  ELECTRONICS
+  CLOTHING
+  SALON
+  RESTAURANT
+  STATIONERY
+  OTHER
+}
+
+enum ShopStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id                 String   @id
   mobile             String   @unique
@@ -41,6 +60,62 @@ model User {
 
   workers   Worker[]
   chatRooms ChatRoom[]
+  shops     Shop[]
+  stores    Store[]
+}
+
+model Store {
+  id          String   @id
+  userId      String
+  name        String
+  description String?
+  openTime    String?
+  closeTime   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@index([userId])
+  @@map("store")
+}
+
+model Product {
+  id          String   @id
+  storeId     String
+  name        String
+  description String?
+  price       Float
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("product")
+}
+
+model Shop {
+  id          String       @id
+  userId      String
+  name        String
+  description String
+  category    ShopCategory
+  contactPhone String
+  logoUrl     String
+  branch      String?
+  latitude    Float?
+  longitude   Float?
+  status      ShopStatus   @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("shop")
 }
 
 model Category {

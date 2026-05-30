@@ -2,6 +2,49 @@ import { z } from "zod";
 
 const removeWhitespace = (value: string) => value.replace(/\s+/g, "");
 
+// Accepts DD/MM/YYYY or YYYY-MM-DD and returns a Date in UTC at 00:00.
+// Rejects future dates and dates older than 120 years.
+const parseDateOfBirth = (raw: string) => {
+  const trimmed = raw.trim();
+  let year: number;
+  let month: number;
+  let day: number;
+
+  const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+
+  if (dmy) {
+    day = Number(dmy[1]);
+    month = Number(dmy[2]);
+    year = Number(dmy[3]);
+  } else if (ymd) {
+    year = Number(ymd[1]);
+    month = Number(ymd[2]);
+    day = Number(ymd[3]);
+  } else {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  const now = new Date();
+  if (date.getTime() > now.getTime()) {
+    return null;
+  }
+  const minYear = now.getUTCFullYear() - 120;
+  if (year < minYear) {
+    return null;
+  }
+  return date;
+};
+
 export const uploadProfileSchema = z.object({
   firstName: z
     .string()
@@ -15,6 +58,25 @@ export const uploadProfileSchema = z.object({
     .string()
     .transform(removeWhitespace)
     .pipe(z.string().min(1, "Gender is required")),
+  dateOfBirth: z
+    .preprocess(
+      (val) => {
+        if (val === undefined || val === null) {
+          return undefined;
+        }
+        if (typeof val === "string" && val.trim() === "") {
+          return undefined;
+        }
+        return val;
+      },
+      z
+        .string()
+        .refine((v) => parseDateOfBirth(v) !== null, {
+          message: "Date of birth must be a valid DD/MM/YYYY date",
+        })
+        .transform((v) => parseDateOfBirth(v) as Date)
+        .optional()
+    ),
 });
 
 export type UploadProfileInput = z.infer<typeof uploadProfileSchema>;

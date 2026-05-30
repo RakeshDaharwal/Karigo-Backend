@@ -88,3 +88,51 @@ export const uploadAadhaarImage = withUploadErrorHandler(
   baseUploader.single("aadhaarImage"),
   "aadhaar",
 );
+
+export const uploadShopLogo = withUploadErrorHandler(
+  baseUploader.single("logo"),
+  "shop-logo",
+);
+
+export const uploadProductImage = withUploadErrorHandler(
+  baseUploader.single("image"),
+  "product-image",
+);
+
+const CSV_ALLOWED_TYPES = [
+  "text/csv",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "text/plain",
+  "application/octet-stream",
+];
+
+// Some platforms send unhelpful mimetypes for CSV. Fall back to the file
+// extension when the mimetype is generic.
+const csvFileFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: FileFilterCallback
+) => {
+  const mime = file.mimetype.toLowerCase();
+  const looksCsvByName = file.originalname.toLowerCase().endsWith(".csv");
+  if (CSV_ALLOWED_TYPES.includes(mime) || looksCsvByName) {
+    return cb(null, true);
+  }
+  const err = new Error(
+    "Invalid file type. Upload a .csv file."
+  ) as Error & { code: string };
+  err.code = "LIMIT_UNEXPECTED_FILE_TYPE";
+  return cb(err);
+};
+
+const csvUploader = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: csvFileFilter,
+});
+
+export const uploadProductsCsv = withUploadErrorHandler(
+  csvUploader.single("csv"),
+  "products-csv"
+);
