@@ -4,15 +4,24 @@ const toNumber = (value: string | undefined, fallback: number) => {
   return Number.isNaN(parsed) ? fallback : parsed;
 };
 
+const NODE_ENV = process.env.NODE_ENV || "development";
+
+const resolveDatabaseUrl = () => {
+  if (NODE_ENV === "production") {
+    return process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+  }
+  return process.env.DATABASE_URL;
+};
+
 export const env = {
-  DATABASE_URL: process.env.DATABASE_URL,
+  DATABASE_URL: resolveDatabaseUrl(),
   redisHost: process.env.REDIS_HOST || "127.0.0.1",
   redisPort: toNumber(process.env.REDIS_PORT, 6379),
   redisUsername: process.env.REDIS_USERNAME || "",
   redisPassword: process.env.REDIS_PASSWORD || "",
   redisDb: toNumber(process.env.REDIS_DB, 0),
   port: toNumber(process.env.PORT, 5004),
-  NODE_ENV: process.env.NODE_ENV || "development",
+  NODE_ENV,
   otpTtlSeconds: toNumber(process.env.OTP_TTL_SECONDS, 300),
   otpCooldownSeconds: toNumber(process.env.OTP_COOLDOWN_SECONDS, 30),
   otpMobileLimitMax: toNumber(process.env.OTP_MOBILE_LIMIT_MAX, 5),

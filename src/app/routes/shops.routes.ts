@@ -5,6 +5,7 @@ import { uploadShopLogo } from "../../middlewares/upload.middleware";
 import {
   getMyShops,
   getNearbyShops,
+  getShopDetails,
   onboardShop,
 } from "../controllers/shops.controller";
 import {
@@ -30,5 +31,7 @@ router.post(
   validate(onboardShopSchema, "ONBOARD_SHOP_VALIDATION_FAILED", "shops"),
   onboardShop
 );
+
+router.get("/:shopId", verifyToken, getShopDetails);
 
 export default router;

@@ -3,6 +3,7 @@ import prisma from "../config/db.conn";
 export type CreateStoreData = {
   id: string;
   userId: string;
+  shopId: string;
   name: string;
   description?: string | null;
   openTime?: string | null;

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { logError, logInfo } from "../../utils/logger.utils";
 import {
+  getApprovedShopWithProductsService,
   getMyShopsService,
   getNearbyApprovedShopsService,
   onboardShopService,
@@ -78,6 +79,65 @@ export const getMyShops = async (
       service: "shops",
       event: "GET_MY_SHOPS_FAILED",
       userId: (req as any)?.user?.userId,
+      path: req.path,
+      error: error.message,
+    });
+
+    next(error);
+  }
+};
+
+export const getShopDetails = async (
+  req: Request<{ shopId: string }>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as Request & { user?: { userId: string } }).user;
+    if (!user?.userId) {
+      const error = new Error("Unauthorized") as Error & { statusCode: number };
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const { shopId } = req.params;
+    if (!shopId) {
+      const error = new Error("shopId is required") as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const data = await getApprovedShopWithProductsService(shopId);
+
+    const productCount = data.stores.reduce(
+      (acc, s) => acc + s.products.length,
+      0
+    );
+
+    logInfo("Shop details fetched", {
+      service: "shops",
+      event: "GET_SHOP_DETAILS_SUCCESS",
+      userId: user.userId,
+      shopId,
+      storeCount: data.stores.length,
+      productCount,
+      path: req.path,
+    });
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Shop fetched",
+      data,
+    });
+  } catch (error: any) {
+    logError("Shop details failed", {
+      service: "shops",
+      event: "GET_SHOP_DETAILS_FAILED",
+      userId: (req as any)?.user?.userId,
+      shopId: (req as any)?.params?.shopId,
       path: req.path,
       error: error.message,
     });

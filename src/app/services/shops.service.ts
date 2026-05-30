@@ -120,6 +120,63 @@ const toNum = (v: unknown) => {
   return Number(v);
 };
 
+export const getApprovedShopWithProductsService = async (shopId: string) => {
+  const shop = await prisma.shop.findFirst({
+    where: { id: shopId, status: "APPROVED" },
+    include: {
+      stores: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          products: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      },
+    },
+  });
+
+  if (!shop) {
+    const err = new Error("Shop not found") as Error & { statusCode: number };
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return {
+    shop: {
+      id: shop.id,
+      userId: shop.userId,
+      name: shop.name,
+      description: shop.description,
+      category: shop.category,
+      contactPhone: shop.contactPhone,
+      logoUrl: shop.logoUrl,
+      branch: shop.branch,
+      latitude: shop.latitude,
+      longitude: shop.longitude,
+      status: shop.status,
+      createdAt: shop.createdAt,
+      updatedAt: shop.updatedAt,
+    },
+    stores: shop.stores.map((store) => ({
+      id: store.id,
+      name: store.name,
+      description: store.description,
+      openTime: store.openTime,
+      closeTime: store.closeTime,
+      products: store.products.map((p) => ({
+        id: p.id,
+        storeId: p.storeId,
+        name: p.name,
+        description: p.description,
+        price: toNum(p.price),
+        imageUrl: p.imageUrl,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      })),
+    })),
+  };
+};
+
 export const getNearbyApprovedShopsService = async (
   userLat: number,
   userLng: number
