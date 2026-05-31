@@ -12,10 +12,7 @@ export const verifySuperAdminOtpSchema = z.object({
     .string()
     .trim()
     .regex(/^[0-9]{10,15}$/, "Mobile must be 10 to 15 digits"),
-  otp: z
-    .string()
-    .trim()
-    .min(4, "OTP is required"),
+  otp: z.coerce.string().trim().min(4, "OTP is required"),
 });
 
 export type SuperAdminLoginInput = z.infer<typeof superAdminLoginSchema>;
@@ -33,7 +30,7 @@ export const verifyBusinessOtpSchema = z.object({
     .string()
     .trim()
     .regex(/^[0-9]{10,15}$/, "Mobile must be 10 to 15 digits"),
-  otp: z.string().trim().min(4, "OTP is required"),
+  otp: z.coerce.string().trim().min(4, "OTP is required"),
 });
 
 export type BusinessLoginInput = z.infer<typeof businessLoginSchema>;
