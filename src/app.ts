@@ -1,10 +1,9 @@
 import express from "express";
 import cors from "cors";
-import { morganRequestLogger } from "./middlewares/morgan";
-import authRoutes from "./modules/auth/routes/auth.route";
-import categoriesRoutes from "./modules/categories/routes/categories.route";
+import { morganRequestLogger } from "./middlewares/morgan.middleware";
+import appApi from "./app/index";
+import webApi from "./web/index";
 import { errorHandler } from "./middlewares/error.middleware";
-
 
 const app = express();
 
@@ -12,10 +11,8 @@ app.use(morganRequestLogger);
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/categories", categoriesRoutes);
-
-
+app.use("/api/v1/app", appApi);
+app.use("/api/v1/web", webApi);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -25,7 +22,6 @@ app.use((req, res) => {
   });
 });
 
-//  Global Error Handler (LAST middleware)
 app.use(errorHandler);
 
 export default app;

@@ -1,6 +1,6 @@
 import { ZodType } from "zod";
 import { Request, Response, NextFunction } from "express";
-import { logError } from "../utils/logger";
+import { logError } from "../utils/logger.utils";
 
 export const validate =
   <T>(
@@ -8,26 +8,29 @@ export const validate =
     eventName: string,
     service: string
   ) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+    (req: Request, res: Response, next: NextFunction) => {
 
-    if (!result.success) {
-      logError("Validation failed", {
-        service,
-        event: eventName,
-        email: req.body?.email,
-        mobile: req.body?.mobile,
-        path: req.path,
-        error: result.error.issues[0].message,
-      });
+      console.log('result', req.body)
 
-      return res.status(400).json({
-        success: false,
-        statusCode: 400,
-        message: result.error.issues[0].message,
-      });
-    }
+      const result = schema.safeParse(req.body);
 
-    req.body = result.data;
-    next();
-  };
+      if (!result.success) {
+        logError("Validation failed", {
+          service,
+          event: eventName,
+          email: req.body?.email,
+          mobile: req.body?.mobile,
+          path: req.path,
+          error: result.error.issues[0].message,
+        });
+
+        return res.status(400).json({
+          success: false,
+          statusCode: 400,
+          message: result.error.issues[0].message,
+        });
+      }
+
+      req.body = result.data;
+      next();
+    };
