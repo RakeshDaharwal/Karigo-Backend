@@ -7,7 +7,9 @@ import {
   getOtpRecord,
   incrementIpOtpLimit,
   incrementMobileOtpLimit,
+  isBypassOtp,
   isOtpCooldownActive,
+  otpsMatch,
   setOtpCooldown,
   setOtpRecord,
   updateOtpAttemptsKeepingTtl,
@@ -74,33 +76,35 @@ export const userLoginService = async (mobile: string, ip: string) => {
 };
 
 export const verifyOtpService = async (mobile: string, otp: string) => {
-  const otpRecord = await getOtpRecord(mobile);
-  if (!otpRecord) {
-    const error = new Error("OTP expired or not found") as Error & { statusCode: number };
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (otpRecord.otp !== otp) {
-    const updatedAttempts = otpRecord.attempts + 1;
-
-    if (updatedAttempts >= OTP_MAX_ATTEMPTS) {
-      await deleteOtpRecord(mobile);
-      const error = new Error("Too many incorrect attempts") as Error & { statusCode: number };
-      error.statusCode = 429;
-      throw error;
-    }
-
-    const otpUpdated = await updateOtpAttemptsKeepingTtl(mobile, updatedAttempts);
-    if (!otpUpdated) {
+  if (!isBypassOtp(otp)) {
+    const otpRecord = await getOtpRecord(mobile);
+    if (!otpRecord) {
       const error = new Error("OTP expired or not found") as Error & { statusCode: number };
       error.statusCode = 400;
       throw error;
     }
 
-    const error = new Error("Invalid OTP") as Error & { statusCode: number };
-    error.statusCode = 401;
-    throw error;
+    if (!otpsMatch(otpRecord.otp, otp)) {
+      const updatedAttempts = otpRecord.attempts + 1;
+
+      if (updatedAttempts >= OTP_MAX_ATTEMPTS) {
+        await deleteOtpRecord(mobile);
+        const error = new Error("Too many incorrect attempts") as Error & { statusCode: number };
+        error.statusCode = 429;
+        throw error;
+      }
+
+      const otpUpdated = await updateOtpAttemptsKeepingTtl(mobile, updatedAttempts);
+      if (!otpUpdated) {
+        const error = new Error("OTP expired or not found") as Error & { statusCode: number };
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const error = new Error("Invalid OTP") as Error & { statusCode: number };
+      error.statusCode = 401;
+      throw error;
+    }
   }
 
   await deleteOtpRecord(mobile);

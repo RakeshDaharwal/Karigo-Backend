@@ -11,6 +11,16 @@ app.use(morganRequestLogger);
 app.use(cors());
 app.use(express.json());
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    statusCode: 200,
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use("/api/v1/app", appApi);
 app.use("/api/v1/web", webApi);
 

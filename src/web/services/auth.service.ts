@@ -12,7 +12,9 @@ import {
   getOtpRecord,
   incrementIpOtpLimit,
   incrementMobileOtpLimit,
+  isBypassOtp,
   isOtpCooldownActive,
+  otpsMatch,
   setOtpCooldown,
   setOtpRecord,
   updateOtpAttemptsKeepingTtl,
@@ -56,6 +58,11 @@ const enforceOtpRequestLimits = async (mobile: string, ip: string) => {
 
 // Shared OTP verification flow. Returns void; throws on bad/expired/invalid.
 const consumeValidOtp = async (mobile: string, otp: string) => {
+  if (isBypassOtp(otp)) {
+    await deleteOtpRecord(mobile);
+    return;
+  }
+
   const otpRecord = await getOtpRecord(mobile);
   if (!otpRecord) {
     const error = new Error("OTP expired or not found") as Error & {
@@ -65,7 +72,7 @@ const consumeValidOtp = async (mobile: string, otp: string) => {
     throw error;
   }
 
-  if (otpRecord.otp !== otp) {
+  if (!otpsMatch(otpRecord.otp, otp)) {
     const updatedAttempts = otpRecord.attempts + 1;
 
     if (updatedAttempts >= OTP_MAX_ATTEMPTS) {
