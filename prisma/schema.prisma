@@ -17,6 +17,30 @@ enum Role {
   ADMIN
 }
 
+enum PartnerType {
+  INDIVIDUAL
+  BUSINESS
+}
+
+enum ShopCategory {
+  FOOD
+  GROCERY
+  HARDWARE
+  PHARMACY
+  ELECTRONICS
+  CLOTHING
+  SALON
+  RESTAURANT
+  STATIONERY
+  OTHER
+}
+
+enum ShopStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id                 String   @id
   mobile             String   @unique
@@ -24,22 +48,78 @@ model User {
   lastName           String?
   gender             String?
   dateOfBirth        DateTime?
-  country            String?
-  state              String?
-  district           String?
-  branch             String? // village / town / area
-  latitude           Float?
-  longitude          Float?
-  profileImage       String? // GCP URL
+  branchDetails      Json?
+  profileImage       String?
 
   isVerified         Boolean  @default(false)
   isProfileCompleted Boolean  @default(false)
   role               Role     @default(USER)
 
   createdAt          DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  updatedAt          DateTime @updatedAt
 
-  workers Worker[]
+  workers   Worker[]
+  chatRooms ChatRoom[]
+  shops     Shop[]
+  stores    Store[]
+}
+
+model Store {
+  id          String   @id
+  userId      String
+  shopId      String
+  name        String
+  description String?
+  openTime    String?
+  closeTime   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop     Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@index([userId])
+  @@index([shopId])
+  @@map("store")
+}
+
+model Product {
+  id          String   @id
+  storeId     String
+  name        String
+  description String?
+  price       Float
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("product")
+}
+
+model Shop {
+  id          String       @id
+  userId      String
+  name        String
+  description String
+  category    ShopCategory
+  contactPhone String
+  logoUrl     String
+  branch      String?
+  latitude    Float?
+  longitude   Float?
+  status      ShopStatus   @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stores Store[]
+
+  @@index([userId])
+  @@map("shop")
 }
 
 model Category {
@@ -63,16 +143,13 @@ model SubCategory {
 }
 
 model Worker {
-  id              String    @id
+  id              String       @id
   userId          String
   mobile          String
   firstName       String?
   lastName        String?
   gender          String?
   dateOfBirth     DateTime?
-  country         String?
-  state           String?
-  district        String?
   branch          String?
   latitude        Float?
   longitude       Float?
@@ -80,14 +157,46 @@ model Worker {
   categoryId      String
   aadhaarImageUrl String?
   subCategoryIds  String[]
-  status          String    @default("PENDING")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  partnerType     PartnerType?
+  businessName    String?
+  status          String       @default("PENDING")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category @relation(fields: [categoryId], references: [id])
+  chatRooms ChatRoom[]
 
   @@index([userId])
   @@index([categoryId])
   @@map("worker")
+}
+
+model ChatRoom {
+  id        String   @id
+  userId    String
+  workerId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@unique([userId, workerId])
+  @@index([userId])
+  @@index([workerId])
+}
+
+model ChatMessage {
+  id        String   @id
+  roomId    String
+  senderId  String
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
 }

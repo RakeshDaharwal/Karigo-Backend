@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../config/db.conn";
 import { Role } from "../generated/prisma/enums";
+import { countApprovedShopsByUserId } from "../repositories/shop.repository";
 
 const decodeAuthToken = (authorizationHeader?: string) => {
   if (!authorizationHeader || !authorizationHeader.startsWith("Bearer ")) {
@@ -105,6 +106,58 @@ export const requireSuperAdmin = async (
       const error = new Error("Access denied. Super admin only") as Error & {
         statusCode: number;
       };
+      error.statusCode = 403;
+      return next(error);
+    }
+
+    (req as Request & { user?: { userId: string; role: Role } }).user = {
+      userId: user.id,
+      role: user.role,
+    };
+
+    next();
+  } catch (error: any) {
+    if (
+      error?.name === "TokenExpiredError" ||
+      error?.name === "JsonWebTokenError"
+    ) {
+      const authError = new Error("Invalid or expired token") as Error & {
+        statusCode: number;
+      };
+      authError.statusCode = 401;
+      return next(authError);
+    }
+
+    next(error);
+  }
+};
+
+// Authorizes a request as a business owner: valid token + at least one
+// APPROVED shop owned by the user. Used by /web business endpoints.
+export const requireBusinessUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const decoded = decodeAuthToken(req.headers.authorization);
+    const userId = userIdFromDecoded(decoded);
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      const error = new Error("User not found") as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const approvedCount = await countApprovedShopsByUserId(user.id);
+    if (approvedCount === 0) {
+      const error = new Error(
+        "Shop not registered or not approved"
+      ) as Error & { statusCode: number };
       error.statusCode = 403;
       return next(error);
     }

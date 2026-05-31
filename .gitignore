@@ -17,6 +17,3 @@ src/generated/
 # logs
 logs
 *.log
-
-# secrets
-src/data/gcp-key.json
