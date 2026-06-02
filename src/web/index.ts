@@ -17,7 +17,7 @@ router.use("/categories", categoriesRoutes);
 router.use("/subcategories", subcategoriesRoutes);
 router.use("/business-categories", businessCategoriesRoutes);
 router.use("/analytics", analyticsRoutes);
-router.use("/business", businessRoutes);
 router.use("/business/stores", storeRoutes);
+router.use("/business", businessRoutes);
 
 export default router;
