@@ -1,11 +1,10 @@
 import prisma from "../config/db.conn";
-import { BusinessCategory } from "../generated/prisma/enums";
 
 export type BusinessStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type ListBusinessesFilters = {
   status: BusinessStatus;
-  category?: BusinessCategory;
+  categoryId?: string;
   search?: string;
 };
 
@@ -14,8 +13,8 @@ const buildWhere = (filters: ListBusinessesFilters) => {
     status: filters.status,
   };
 
-  if (filters.category) {
-    where.category = filters.category;
+  if (filters.categoryId) {
+    where.categoryId = filters.categoryId;
   }
 
   const term = filters.search?.trim();
@@ -41,6 +40,9 @@ export const listBusinessesByFilters = (filters: ListBusinessesFilters) => {
           firstName: true,
           lastName: true,
         },
+      },
+      category: {
+        select: { id: true, name: true },
       },
     },
     orderBy: { createdAt: "desc" },
@@ -70,6 +72,9 @@ export const findBusinessByIdDetailed = (id: string) => {
           createdAt: true,
         },
       },
+      category: {
+        select: { id: true, name: true },
+      },
     },
   });
 };
@@ -78,6 +83,9 @@ export const findApprovedBusinessesByUserId = (userId: string) => {
   return prisma.business.findMany({
     where: { userId, status: "APPROVED" },
     orderBy: { createdAt: "desc" },
+    include: {
+      category: { select: { id: true, name: true } },
+    },
   });
 };
 

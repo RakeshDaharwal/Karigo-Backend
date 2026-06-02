@@ -75,7 +75,7 @@ export const getApprovedWorkersByCategoryNearby = async (
   const subCategories =
     allSubIds.length === 0
       ? []
-      : await prisma.subCategory.findMany({
+      : await prisma.workerSubCategory.findMany({
           where: {
             id: { in: allSubIds },
             deletedAt: null,

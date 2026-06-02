@@ -1,6 +1,6 @@
+import prisma from "../../config/db.conn";
 import { Role } from "../../generated/prisma/enums";
 import { countUsersByRole } from "../../repositories/analytics.repository";
-import { findApprovedBusinessesByUserId } from "../../repositories/business.repository";
 
 export const getDashboardOverviewService = async () => {
   const [totalUsers, totalWorkers] = await Promise.all([
@@ -18,7 +18,13 @@ export const getDashboardOverviewService = async () => {
 // Orders/revenue are placeholders (no orders model yet); totals are 0
 // but the response shape stays stable for the frontend cards.
 export const getBusinessOverviewService = async (userId: string) => {
-  const businesses = await findApprovedBusinessesByUserId(userId);
+  const businesses = await prisma.business.findMany({
+    where: { userId, status: "APPROVED" },
+    orderBy: { createdAt: "desc" },
+    include: {
+      category: { select: { id: true, name: true } },
+    },
+  });
 
   return {
     totalOrders: 0,
@@ -27,7 +33,7 @@ export const getBusinessOverviewService = async (userId: string) => {
     businesses: businesses.map((b) => ({
       id: b.id,
       name: b.name,
-      category: b.category,
+      category: b.category ? { id: b.category.id, name: b.category.name } : null,
     })),
   };
 };

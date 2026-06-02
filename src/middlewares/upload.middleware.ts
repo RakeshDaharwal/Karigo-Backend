@@ -109,6 +109,16 @@ export const uploadBusinessLogo = withUploadErrorHandler(
   "business-logo",
 );
 
+export const uploadPropertyPhoto = withUploadErrorHandler(
+  baseUploader.single("photo"),
+  "property-photo",
+);
+
+export const uploadVehiclePhotos = withUploadErrorHandler(
+  baseUploader.array("photos", 5),
+  "vehicle-photos",
+);
+
 export const uploadProductImage = withUploadErrorHandler(
   baseUploader.single("image"),
   "product-image",

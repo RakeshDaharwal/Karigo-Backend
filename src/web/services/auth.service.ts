@@ -291,7 +291,7 @@ export const verifyBusinessOtpService = async (mobile: string, otp: string) => {
     businesses: approvedBusinesses.map((b) => ({
       id: b.id,
       name: b.name,
-      category: b.category,
+      category: b.category ? { id: b.category.id, name: b.category.name } : null,
       logoUrl: b.logoUrl,
       branch: b.branch,
       status: b.status,
@@ -327,7 +327,7 @@ export const getBusinessProfileService = async (userId: string) => {
     businesses: approvedBusinesses.map((b) => ({
       id: b.id,
       name: b.name,
-      category: b.category,
+      category: b.category ? { id: b.category.id, name: b.category.name } : null,
       logoUrl: b.logoUrl,
       branch: b.branch,
       status: b.status,

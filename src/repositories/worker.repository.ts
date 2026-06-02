@@ -66,7 +66,7 @@ export const findWorkerByIdDetailed = (id: string) => {
 
 export const findSubCategoriesByIds = (ids: string[]) => {
   if (!ids.length) return Promise.resolve([]);
-  return prisma.subCategory.findMany({
+  return prisma.workerSubCategory.findMany({
     where: { id: { in: ids } },
     select: { id: true, name: true },
   });

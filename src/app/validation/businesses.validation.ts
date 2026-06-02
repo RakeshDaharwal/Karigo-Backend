@@ -2,22 +2,6 @@ import { z } from "zod";
 
 const trimString = (val: unknown) => (typeof val === "string" ? val.trim() : val);
 
-export const BUSINESS_CATEGORY_VALUES = [
-  "FOOD",
-  "GROCERY",
-  "PHARMACY",
-  "HEALTHCARE",
-  "HARDWARE",
-  "ELECTRONICS",
-  "MOBILE",
-  "FASHION",
-  "FOOTWEAR",
-  "FURNITURE",
-  "BEAUTY",
-  "FITNESS",
-  "SPORTS",
-] as const;
-
 export const onboardBusinessSchema = z.object({
   name: z.preprocess(
     trimString,
@@ -33,11 +17,16 @@ export const onboardBusinessSchema = z.object({
       .min(10, "Description must be at least 10 characters")
       .max(500, "Description must be under 500 characters")
   ),
-  category: z.preprocess(
-    (val) => (typeof val === "string" ? val.trim().toUpperCase() : val),
-    z.enum(BUSINESS_CATEGORY_VALUES, {
-      message: "Please select a valid business category",
-    })
+  categoryId: z.preprocess(
+    trimString,
+    z
+      .string()
+      .refine(
+        (v) =>
+          /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(v) ||
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
+        "Please select a valid business category"
+      )
   ),
   contactPhone: z.preprocess(
     trimString,

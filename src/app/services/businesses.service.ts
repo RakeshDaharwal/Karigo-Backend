@@ -1,7 +1,7 @@
 import { ulid } from "ulid";
 import prisma from "../../config/db.conn";
-import { BusinessCategory } from "../../generated/prisma/enums";
 import { uploadImageBuffer } from "../../utils/cloudinary.utils";
+import { findBusinessCategoryById } from "../../repositories/business_category.repository";
 import { OnboardBusinessInput } from "../validation/businesses.validation";
 
 const branchInfoFromDetails = (details: unknown) => {
@@ -14,6 +14,39 @@ const branchInfoFromDetails = (details: unknown) => {
   const lng = typeof obj.longitude === "number" ? obj.longitude : null;
   return { name, latitude: lat, longitude: lng };
 };
+
+const mapBusinessForResponse = (business: {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  contactPhone: string;
+  logoUrl: string;
+  branch: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: Date;
+  updatedAt: Date;
+  categoryId: string;
+  category?: { id: string; name: string } | null;
+}) => ({
+  id: business.id,
+  userId: business.userId,
+  name: business.name,
+  description: business.description,
+  category: business.category
+    ? { id: business.category.id, name: business.category.name }
+    : { id: business.categoryId, name: "" },
+  contactPhone: business.contactPhone,
+  logoUrl: business.logoUrl,
+  branch: business.branch,
+  latitude: business.latitude,
+  longitude: business.longitude,
+  status: business.status,
+  createdAt: business.createdAt,
+  updatedAt: business.updatedAt,
+});
 
 export const onboardBusinessService = async (
   userId: string,
@@ -29,6 +62,15 @@ export const onboardBusinessService = async (
 
   if (!file) {
     const err = new Error("Business logo is required") as Error & { statusCode: number };
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const category = await findBusinessCategoryById(body.categoryId);
+  if (!category) {
+    const err = new Error("Selected business category is not available") as Error & {
+      statusCode: number;
+    };
     err.statusCode = 400;
     throw err;
   }
@@ -64,9 +106,9 @@ export const onboardBusinessService = async (
     data: {
       id: businessScopeId,
       userId,
+      categoryId: category.id,
       name: body.name,
       description: body.description,
-      category: body.category as BusinessCategory,
       contactPhone: body.contactPhone,
       logoUrl: uploaded.url,
       branch: branch.name,
@@ -74,17 +116,23 @@ export const onboardBusinessService = async (
       longitude: branch.longitude,
       status: "PENDING",
     },
+    include: {
+      category: { select: { id: true, name: true } },
+    },
   });
 
-  return created;
+  return mapBusinessForResponse(created);
 };
 
 export const getMyBusinessesService = async (userId: string) => {
   const businesses = await prisma.business.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
+    include: {
+      category: { select: { id: true, name: true } },
+    },
   });
-  return businesses;
+  return businesses.map(mapBusinessForResponse);
 };
 
 const NEARBY_BUSINESSES_RADIUS_KM = 5;
@@ -94,7 +142,8 @@ type NearbyBusinessRow = {
   userId: string;
   name: string;
   description: string;
-  category: BusinessCategory;
+  categoryId: string;
+  categoryName: string;
   contactPhone: string;
   logoUrl: string;
   branch: string | null;
@@ -124,6 +173,7 @@ export const getApprovedBusinessWithProductsService = async (businessId: string)
   const business = await prisma.business.findFirst({
     where: { id: businessId, status: "APPROVED" },
     include: {
+      category: { select: { id: true, name: true } },
       stores: {
         orderBy: { createdAt: "asc" },
         include: {
@@ -147,7 +197,9 @@ export const getApprovedBusinessWithProductsService = async (businessId: string)
       userId: business.userId,
       name: business.name,
       description: business.description,
-      category: business.category,
+      category: business.category
+        ? { id: business.category.id, name: business.category.name }
+        : { id: business.categoryId, name: "" },
       contactPhone: business.contactPhone,
       logoUrl: business.logoUrl,
       branch: business.branch,
@@ -188,7 +240,8 @@ export const getNearbyApprovedBusinessesService = async (
         b."userId",
         b.name,
         b.description,
-        b.category,
+        b."categoryId",
+        bc.name AS "categoryName",
         b."contactPhone",
         b."logoUrl",
         b.branch,
@@ -206,6 +259,7 @@ export const getNearbyApprovedBusinessesService = async (
           )
         ) AS distance_km
       FROM business b
+      JOIN business_category bc ON bc.id = b."categoryId"
       WHERE b.status = 'APPROVED'
         AND b.latitude IS NOT NULL
         AND b.longitude IS NOT NULL
@@ -222,7 +276,7 @@ export const getNearbyApprovedBusinessesService = async (
       userId: row.userId,
       name: row.name,
       description: row.description,
-      category: row.category,
+      category: { id: row.categoryId, name: row.categoryName },
       contactPhone: row.contactPhone,
       logoUrl: row.logoUrl,
       branch: row.branch,

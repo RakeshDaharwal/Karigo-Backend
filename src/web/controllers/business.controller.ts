@@ -65,7 +65,7 @@ export const listBusinesses = async (
       service: "business",
       event: "LIST_BUSINESSES_SUCCESS",
       status: parsed.data.status,
-      category: parsed.data.category,
+      categoryId: parsed.data.categoryId,
       path: req.path,
     });
 

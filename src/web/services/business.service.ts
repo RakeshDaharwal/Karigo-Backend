@@ -1,5 +1,4 @@
 import prisma from "../../config/db.conn";
-import { BusinessCategory } from "../../generated/prisma/enums";
 import {
   countBusinessStatuses,
   findBusinessByIdDetailed,
@@ -13,7 +12,7 @@ export const getBusinessStatsService = async () => {
 
 export const listBusinessesService = async (params: {
   status: BusinessStatus;
-  category?: BusinessCategory;
+  categoryId?: string;
   search?: string;
 }) => {
   const businesses = await listBusinessesByFilters(params);
@@ -22,7 +21,9 @@ export const listBusinessesService = async (params: {
     id: b.id,
     name: b.name,
     description: b.description,
-    category: b.category,
+    category: b.category
+      ? { id: b.category.id, name: b.category.name }
+      : null,
     contactPhone: b.contactPhone,
     logoUrl: b.logoUrl,
     status: b.status,
@@ -53,7 +54,9 @@ export const getBusinessDetailsService = async (businessId: string) => {
     id: business.id,
     name: business.name,
     description: business.description,
-    category: business.category,
+    category: business.category
+      ? { id: business.category.id, name: business.category.name }
+      : null,
     contactPhone: business.contactPhone,
     logoUrl: business.logoUrl,
     status: business.status,
