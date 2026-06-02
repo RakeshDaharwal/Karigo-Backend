@@ -7,6 +7,7 @@ import { env } from "./config/env";
 import http from "http";
 import { Server } from "socket.io";
 import { handleSocketConnection } from "./app/socket/chat.socket";
+import { startLogsCleanupCron } from "./utils/logsCleanup.cron";
 
 const PORT = env.port || 5004;
 
@@ -14,6 +15,8 @@ const PORT = env.port || 5004;
 const startServer = async () => {
   await connectDB();
   await connectRedis();
+
+  startLogsCleanupCron();
 
   const server = http.createServer(app);
   const io = new Server(server, { cors: { origin: "*" } });

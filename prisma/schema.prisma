@@ -17,28 +17,53 @@ enum Role {
   ADMIN
 }
 
-enum PartnerType {
-  INDIVIDUAL
-  BUSINESS
-}
-
-enum ShopCategory {
+enum BusinessCategory {
   FOOD
   GROCERY
-  HARDWARE
   PHARMACY
+  HEALTHCARE
+  HARDWARE
   ELECTRONICS
-  CLOTHING
-  SALON
-  RESTAURANT
-  STATIONERY
-  OTHER
+  MOBILE
+  FASHION
+  FOOTWEAR
+  FURNITURE
+  BEAUTY
+  FITNESS
+  SPORTS
 }
 
-enum ShopStatus {
+enum BusinessStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum AddressType {
+  HOME
+  WORK
+  OTHER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  ONLINE
 }
 
 model User {
@@ -58,16 +83,19 @@ model User {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  workers   Worker[]
-  chatRooms ChatRoom[]
-  shops     Shop[]
-  stores    Store[]
+  workers    Worker[]
+  chatRooms  ChatRoom[]
+  businesses Business[]
+  stores     Store[]
+  addresses  UserAddress[]
+  carts      Cart[]
+  orders     Order[]
 }
 
 model Store {
   id          String   @id
   userId      String
-  shopId      String
+  businessId  String
   name        String
   description String?
   openTime    String?
@@ -76,11 +104,11 @@ model Store {
   updatedAt   DateTime @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shop     Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   products Product[]
 
   @@index([userId])
-  @@index([shopId])
+  @@index([businessId])
   @@map("store")
 }
 
@@ -100,26 +128,26 @@ model Product {
   @@map("product")
 }
 
-model Shop {
-  id          String       @id
-  userId      String
-  name        String
-  description String
-  category    ShopCategory
+model Business {
+  id           String           @id
+  userId       String
+  name         String
+  description  String
+  category     BusinessCategory
   contactPhone String
-  logoUrl     String
-  branch      String?
-  latitude    Float?
-  longitude   Float?
-  status      ShopStatus   @default(PENDING)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  logoUrl      String
+  branch       String?
+  latitude     Float?
+  longitude    Float?
+  status       BusinessStatus   @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   stores Store[]
 
   @@index([userId])
-  @@map("shop")
+  @@map("business")
 }
 
 model Category {
@@ -157,8 +185,7 @@ model Worker {
   categoryId      String
   aadhaarImageUrl String?
   subCategoryIds  String[]
-  partnerType     PartnerType?
-  businessName    String?
+  experienceYears Int?
   status          String       @default("PENDING")
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -199,4 +226,88 @@ model ChatMessage {
   room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@index([roomId])
+}
+
+model UserAddress {
+  id            String      @id
+  userId        String
+  name          String
+  contactNumber String
+  houseNo       String?
+  addressLine   String
+  addressType   AddressType @default(HOME)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  carts  Cart[]
+
+  @@index([userId])
+  @@map("user_address")
+}
+
+model Cart {
+  id                String   @id
+  userId            String   @unique
+  deliveryAddressId String?
+  totalPrice        Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryAddress UserAddress? @relation(fields: [deliveryAddressId], references: [id], onDelete: SetNull)
+  items           CartItem[]
+
+  @@index([userId])
+  @@map("cart")
+}
+
+model CartItem {
+  id          String   @id
+  cartId      String
+  productId   String
+  productName String
+  quantity    Int      @default(1)
+  price       Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@map("cart_item")
+}
+
+model Order {
+  id              String        @id
+  userId          String
+  deliveryAddress Json
+  totalPrice      Float
+  status          OrderStatus   @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   PaymentMethod @default(COD)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items OrderItem[]
+
+  @@index([userId])
+  @@map("order")
+}
+
+model OrderItem {
+  id          String   @id
+  orderId     String
+  productId   String
+  productName String
+  quantity    Int
+  price       Float
+  createdAt   DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_item")
 }

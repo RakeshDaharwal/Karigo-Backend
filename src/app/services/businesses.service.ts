@@ -1,8 +1,8 @@
 import { ulid } from "ulid";
 import prisma from "../../config/db.conn";
-import { ShopCategory } from "../../generated/prisma/enums";
+import { BusinessCategory } from "../../generated/prisma/enums";
 import { uploadImageBuffer } from "../../utils/cloudinary.utils";
-import { OnboardShopInput } from "../validation/shops.validation";
+import { OnboardBusinessInput } from "../validation/businesses.validation";
 
 const branchInfoFromDetails = (details: unknown) => {
   if (!details || typeof details !== "object") {
@@ -15,9 +15,9 @@ const branchInfoFromDetails = (details: unknown) => {
   return { name, latitude: lat, longitude: lng };
 };
 
-export const onboardShopService = async (
+export const onboardBusinessService = async (
   userId: string,
-  body: OnboardShopInput,
+  body: OnboardBusinessInput,
   file?: Express.Multer.File
 ) => {
   const dbUser = await prisma.user.findUnique({ where: { id: userId } });
@@ -28,7 +28,7 @@ export const onboardShopService = async (
   }
 
   if (!file) {
-    const err = new Error("Shop logo is required") as Error & { statusCode: number };
+    const err = new Error("Business logo is required") as Error & { statusCode: number };
     err.statusCode = 400;
     throw err;
   }
@@ -36,37 +36,37 @@ export const onboardShopService = async (
   const branch = branchInfoFromDetails(dbUser.branchDetails);
   if (!branch.name || branch.latitude == null || branch.longitude == null) {
     const err = new Error(
-      "Please select your branch before onboarding a shop"
+      "Please select your branch before onboarding a business"
     ) as Error & { statusCode: number };
     err.statusCode = 400;
     throw err;
   }
 
-  const existingPending = await prisma.shop.findFirst({
+  const existingPending = await prisma.business.findFirst({
     where: { userId, status: "PENDING" },
   });
   if (existingPending) {
     const err = new Error(
-      "You already have a pending shop onboarding request"
+      "You already have a pending business onboarding request"
     ) as Error & { statusCode: number };
     err.statusCode = 409;
     throw err;
   }
 
-  const shopScopeId = ulid();
+  const businessScopeId = ulid();
   const uploaded = await uploadImageBuffer(
     file.buffer,
-    "shops/logos",
-    `shop_${userId}_${shopScopeId}`
+    "businesses/logos",
+    `business_${userId}_${businessScopeId}`
   );
 
-  const created = await prisma.shop.create({
+  const created = await prisma.business.create({
     data: {
-      id: shopScopeId,
+      id: businessScopeId,
       userId,
       name: body.name,
       description: body.description,
-      category: body.category as ShopCategory,
+      category: body.category as BusinessCategory,
       contactPhone: body.contactPhone,
       logoUrl: uploaded.url,
       branch: branch.name,
@@ -79,22 +79,22 @@ export const onboardShopService = async (
   return created;
 };
 
-export const getMyShopsService = async (userId: string) => {
-  const shops = await prisma.shop.findMany({
+export const getMyBusinessesService = async (userId: string) => {
+  const businesses = await prisma.business.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
   });
-  return shops;
+  return businesses;
 };
 
-const NEARBY_SHOPS_RADIUS_KM = 5;
+const NEARBY_BUSINESSES_RADIUS_KM = 5;
 
-type NearbyShopRow = {
+type NearbyBusinessRow = {
   id: string;
   userId: string;
   name: string;
   description: string;
-  category: ShopCategory;
+  category: BusinessCategory;
   contactPhone: string;
   logoUrl: string;
   branch: string | null;
@@ -120,9 +120,9 @@ const toNum = (v: unknown) => {
   return Number(v);
 };
 
-export const getApprovedShopWithProductsService = async (shopId: string) => {
-  const shop = await prisma.shop.findFirst({
-    where: { id: shopId, status: "APPROVED" },
+export const getApprovedBusinessWithProductsService = async (businessId: string) => {
+  const business = await prisma.business.findFirst({
+    where: { id: businessId, status: "APPROVED" },
     include: {
       stores: {
         orderBy: { createdAt: "asc" },
@@ -135,29 +135,29 @@ export const getApprovedShopWithProductsService = async (shopId: string) => {
     },
   });
 
-  if (!shop) {
-    const err = new Error("Shop not found") as Error & { statusCode: number };
+  if (!business) {
+    const err = new Error("Business not found") as Error & { statusCode: number };
     err.statusCode = 404;
     throw err;
   }
 
   return {
-    shop: {
-      id: shop.id,
-      userId: shop.userId,
-      name: shop.name,
-      description: shop.description,
-      category: shop.category,
-      contactPhone: shop.contactPhone,
-      logoUrl: shop.logoUrl,
-      branch: shop.branch,
-      latitude: shop.latitude,
-      longitude: shop.longitude,
-      status: shop.status,
-      createdAt: shop.createdAt,
-      updatedAt: shop.updatedAt,
+    business: {
+      id: business.id,
+      userId: business.userId,
+      name: business.name,
+      description: business.description,
+      category: business.category,
+      contactPhone: business.contactPhone,
+      logoUrl: business.logoUrl,
+      branch: business.branch,
+      latitude: business.latitude,
+      longitude: business.longitude,
+      status: business.status,
+      createdAt: business.createdAt,
+      updatedAt: business.updatedAt,
     },
-    stores: shop.stores.map((store) => ({
+    stores: business.stores.map((store) => ({
       id: store.id,
       name: store.name,
       description: store.description,
@@ -177,47 +177,47 @@ export const getApprovedShopWithProductsService = async (shopId: string) => {
   };
 };
 
-export const getNearbyApprovedShopsService = async (
+export const getNearbyApprovedBusinessesService = async (
   userLat: number,
   userLng: number
 ) => {
-  const rows = await prisma.$queryRaw<NearbyShopRow[]>`
+  const rows = await prisma.$queryRaw<NearbyBusinessRow[]>`
     SELECT * FROM (
       SELECT
-        s.id,
-        s."userId",
-        s.name,
-        s.description,
-        s.category,
-        s."contactPhone",
-        s."logoUrl",
-        s.branch,
-        s.latitude,
-        s.longitude,
-        s.status,
-        s."createdAt",
-        s."updatedAt",
+        b.id,
+        b."userId",
+        b.name,
+        b.description,
+        b.category,
+        b."contactPhone",
+        b."logoUrl",
+        b.branch,
+        b.latitude,
+        b.longitude,
+        b.status,
+        b."createdAt",
+        b."updatedAt",
         (
           6371 * acos(
             LEAST(1::double precision, GREATEST(-1::double precision,
-              cos(radians(${userLat})) * cos(radians(s.latitude)) * cos(radians(s.longitude) - radians(${userLng}))
-              + sin(radians(${userLat})) * sin(radians(s.latitude))
+              cos(radians(${userLat})) * cos(radians(b.latitude)) * cos(radians(b.longitude) - radians(${userLng}))
+              + sin(radians(${userLat})) * sin(radians(b.latitude))
             ))
           )
         ) AS distance_km
-      FROM shop s
-      WHERE s.status = 'APPROVED'
-        AND s.latitude IS NOT NULL
-        AND s.longitude IS NOT NULL
+      FROM business b
+      WHERE b.status = 'APPROVED'
+        AND b.latitude IS NOT NULL
+        AND b.longitude IS NOT NULL
     ) sub
-    WHERE sub.distance_km <= ${NEARBY_SHOPS_RADIUS_KM}
+    WHERE sub.distance_km <= ${NEARBY_BUSINESSES_RADIUS_KM}
     ORDER BY sub.distance_km ASC
   `;
 
   return {
     userLocation: { latitude: userLat, longitude: userLng },
-    radiusKm: NEARBY_SHOPS_RADIUS_KM,
-    shops: rows.map((row) => ({
+    radiusKm: NEARBY_BUSINESSES_RADIUS_KM,
+    businesses: rows.map((row) => ({
       id: row.id,
       userId: row.userId,
       name: row.name,

@@ -1,11 +1,9 @@
 import prisma from "../config/db.conn";
-import { PartnerType } from "../generated/prisma/enums";
 
 export type WorkerStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type ListWorkersFilters = {
   status: WorkerStatus;
-  partnerType?: PartnerType;
   search?: string;
 };
 
@@ -14,17 +12,12 @@ const buildWhere = (filters: ListWorkersFilters) => {
     status: filters.status,
   };
 
-  if (filters.partnerType) {
-    where.partnerType = filters.partnerType;
-  }
-
   const term = filters.search?.trim();
   if (term) {
     where.OR = [
       { firstName: { contains: term, mode: "insensitive" } },
       { lastName: { contains: term, mode: "insensitive" } },
       { branch: { contains: term, mode: "insensitive" } },
-      { businessName: { contains: term, mode: "insensitive" } },
       { mobile: { contains: term } },
     ];
   }

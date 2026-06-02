@@ -89,9 +89,24 @@ export const uploadAadhaarImage = withUploadErrorHandler(
   "aadhaar",
 );
 
-export const uploadShopLogo = withUploadErrorHandler(
+export const requireAadhaarFile = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      statusCode: 400,
+      message: "Aadhaar document is required",
+    });
+  }
+  next();
+};
+
+export const uploadBusinessLogo = withUploadErrorHandler(
   baseUploader.single("logo"),
-  "shop-logo",
+  "business-logo",
 );
 
 export const uploadProductImage = withUploadErrorHandler(

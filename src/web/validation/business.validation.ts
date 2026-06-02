@@ -1,34 +1,37 @@
 import { z } from "zod";
 
-const SHOP_CATEGORY_VALUES = [
+const BUSINESS_CATEGORY_VALUES = [
   "FOOD",
   "GROCERY",
-  "HARDWARE",
   "PHARMACY",
+  "HEALTHCARE",
+  "HARDWARE",
   "ELECTRONICS",
-  "CLOTHING",
-  "SALON",
-  "RESTAURANT",
-  "STATIONERY",
-  "OTHER",
+  "MOBILE",
+  "FASHION",
+  "FOOTWEAR",
+  "FURNITURE",
+  "BEAUTY",
+  "FITNESS",
+  "SPORTS",
 ] as const;
 
-export const reviewShopRequestSchema = z.object({
+export const reviewBusinessRequestSchema = z.object({
   status: z.enum(["APPROVED", "REJECT"], {
     message: "status must be APPROVED or REJECT",
   }),
 });
 
-export type ReviewShopRequestInput = z.infer<typeof reviewShopRequestSchema>;
+export type ReviewBusinessRequestInput = z.infer<typeof reviewBusinessRequestSchema>;
 
-export const listShopsQuerySchema = z.object({
+export const listBusinessesQuerySchema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED"], {
     message: "status must be PENDING, APPROVED or REJECTED",
   }),
   category: z
     .preprocess(
       (val) => (typeof val === "string" ? val.trim().toUpperCase() : val),
-      z.enum(SHOP_CATEGORY_VALUES).optional()
+      z.enum(BUSINESS_CATEGORY_VALUES).optional()
     )
     .optional(),
   search: z
@@ -39,13 +42,13 @@ export const listShopsQuerySchema = z.object({
     .optional(),
 });
 
-export type ListShopsQuery = z.infer<typeof listShopsQuerySchema>;
+export type ListBusinessesQuery = z.infer<typeof listBusinessesQuerySchema>;
 
-export const shopIdParamSchema = z.object({
-  shopId: z.string().refine(
+export const businessIdParamSchema = z.object({
+  businessId: z.string().refine(
     (v) =>
       /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(v) ||
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
-    "Shop id must be a valid id"
+    "Business id must be a valid id"
   ),
 });

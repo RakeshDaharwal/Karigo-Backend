@@ -1,7 +1,11 @@
 import express from "express";
 import { validate } from "../../middlewares/validate.middleware";
 import { verifyToken } from "../../middlewares/auth.middleware";
-import { uploadAadhaarImage, uploadProfileImage } from "../../middlewares/upload.middleware";
+import {
+  requireAadhaarFile,
+  uploadAadhaarImage,
+  uploadProfileImage,
+} from "../../middlewares/upload.middleware";
 import {
   editProfile,
   getMyProfessional,
@@ -40,6 +44,7 @@ router.post(
   "/join/professional",
   verifyToken,
   uploadAadhaarImage,
+  requireAadhaarFile,
   validate(joinProfessionalSchema, "JOIN_PROFESSIONAL_VALIDATION_FAILED", "users"),
   joinKarigoAsProfessional
 );

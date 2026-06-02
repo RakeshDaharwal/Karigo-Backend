@@ -34,11 +34,11 @@ export const getChatRooms = async (
       }
     });
 
-    const roomsWithoutSelfChat = rooms.filter(
-      (room) => room.userId !== room.worker.userId
+    const visibleRooms = rooms.filter(
+      (room) => room.userId !== room.worker.userId && room.messages.length > 0
     );
 
-    const formattedRooms = roomsWithoutSelfChat.map((room) => {
+    const formattedRooms = visibleRooms.map((room) => {
       const isUserSide = room.userId === userId;
 
       const otherPersonName = isUserSide

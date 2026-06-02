@@ -5,7 +5,7 @@ import categoriesRoutes, {
   subcategoriesRoutes,
 } from "./routes/categories.routes";
 import analyticsRoutes from "./routes/analytics.routes";
-import shopRoutes from "./routes/shop.routes";
+import businessRoutes from "./routes/business.routes";
 import storeRoutes from "./routes/store.routes";
 
 const router = Router();
@@ -15,7 +15,7 @@ router.use("/worker", workerRoutes);
 router.use("/categories", categoriesRoutes);
 router.use("/subcategories", subcategoriesRoutes);
 router.use("/analytics", analyticsRoutes);
-router.use("/shop", shopRoutes);
+router.use("/business", businessRoutes);
 router.use("/business/stores", storeRoutes);
 
 export default router;

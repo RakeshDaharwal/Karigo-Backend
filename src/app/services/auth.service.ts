@@ -5,8 +5,6 @@ import { env } from "../../config/env";
 import {
   deleteOtpRecord,
   getOtpRecord,
-  incrementIpOtpLimit,
-  incrementMobileOtpLimit,
   isBypassOtp,
   isOtpCooldownActive,
   otpsMatch,
@@ -15,8 +13,6 @@ import {
   updateOtpAttemptsKeepingTtl,
 } from "../../web/helpers/auth.helper";
 
-const OTP_MOBILE_LIMIT_MAX = env.otpMobileLimitMax;
-const OTP_IP_LIMIT_MAX = env.otpIpLimitMax;
 const OTP_MAX_ATTEMPTS = env.otpMaxAttempts;
 
 const generateOtp = () => {
@@ -27,28 +23,7 @@ export const sendSMS = async (mobile: string, otp: string) => {
   console.log(`Sending OTP ${otp} to mobile ${mobile}`);
 };
 
-export const userLoginService = async (mobile: string, ip: string) => {
-  const [mobileRequestCount, ipRequestCount] = await Promise.all([
-    incrementMobileOtpLimit(mobile),
-    incrementIpOtpLimit(ip),
-  ]);
-
-  if (mobileRequestCount > OTP_MOBILE_LIMIT_MAX) {
-    const error = new Error(
-      "Too many OTP requests for this mobile. Try after 1 hour."
-    ) as Error & { statusCode: number };
-    error.statusCode = 429;
-    throw error;
-  }
-
-  if (ipRequestCount > OTP_IP_LIMIT_MAX) {
-    const error = new Error("Too many OTP requests from this IP. Try after 1 minute.") as Error & {
-      statusCode: number;
-    };
-    error.statusCode = 429;
-    throw error;
-  }
-
+export const userLoginService = async (mobile: string, _ip: string) => {
   const cooldownActive = await isOtpCooldownActive(mobile);
 
   if (cooldownActive) {

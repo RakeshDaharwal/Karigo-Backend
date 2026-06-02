@@ -201,14 +201,18 @@ export const joinKarigoAsProfessional = async (
       throw error;
     }
 
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: "Aadhaar document is required",
+      });
+    }
+
     const created = await joinKarigoProfessionalService(
       user.userId,
       req.body.categoryId,
-      req.body.subCategoryIds,
-      req.body.partnerType,
-      req.body.partnerType === "BUSINESS"
-        ? req.body.businessName?.trim() || null
-        : null,
+      req.body.experienceYears,
       req.file
     );
 

@@ -81,57 +81,29 @@ export const uploadProfileSchema = z.object({
 
 export type UploadProfileInput = z.infer<typeof uploadProfileSchema>;
 
-export const joinProfessionalSchema = z
-  .object({
-    categoryId: z
-      .string()
-      .transform(removeWhitespace)
-      .pipe(z.string().min(1, "Category is required")),
-    subCategoryIds: z.preprocess(
-      (val) => {
-        if (val === undefined || val === null) {
-          return [];
-        }
-        if (typeof val === "string") {
-          try {
-            const parsed = JSON.parse(val);
-            return Array.isArray(parsed) ? parsed : [];
-          } catch {
-            return [];
-          }
-        }
-        return val;
-      },
-      z.array(z.string().min(1)).min(1, "Select at least one skill")
-    ),
-    partnerType: z
-      .preprocess(
-        (val) =>
-          typeof val === "string" ? val.trim().toUpperCase() : val,
-        z.enum(["INDIVIDUAL", "BUSINESS"], {
-          message: "Partner type must be INDIVIDUAL or BUSINESS",
-        })
-      ),
-    businessName: z
-      .preprocess(
-        (val) => (typeof val === "string" ? val.trim() : val),
-        z.string().max(120, "Business name must be under 120 characters").optional()
-      )
-      .nullable()
-      .optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.partnerType === "BUSINESS") {
-      const name = data.businessName?.trim();
-      if (!name || name.length < 2) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["businessName"],
-          message: "Business name is required when partner type is Business",
-        });
+export const joinProfessionalSchema = z.object({
+  categoryId: z
+    .string()
+    .transform(removeWhitespace)
+    .pipe(z.string().min(1, "Category is required")),
+  experienceYears: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null || val === "") {
+        return undefined;
       }
-    }
-  });
+      if (typeof val === "string") {
+        const n = Number(val.trim());
+        return Number.isFinite(n) ? n : val;
+      }
+      return val;
+    },
+    z
+      .number({ message: "Experience is required" })
+      .int("Experience must be a whole number")
+      .min(1, "Experience must be at least 1 year")
+      .max(20, "Experience must be 20 years or less")
+  ),
+});
 
 export type JoinProfessionalInput = z.infer<typeof joinProfessionalSchema>;
 

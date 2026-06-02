@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../config/db.conn";
 import { Role } from "../generated/prisma/enums";
-import { countApprovedShopsByUserId } from "../repositories/shop.repository";
+import { countApprovedBusinessesByUserId } from "../repositories/business.repository";
 
 const decodeAuthToken = (authorizationHeader?: string) => {
   if (!authorizationHeader || !authorizationHeader.startsWith("Bearer ")) {
@@ -133,7 +133,7 @@ export const requireSuperAdmin = async (
 };
 
 // Authorizes a request as a business owner: valid token + at least one
-// APPROVED shop owned by the user. Used by /web business endpoints.
+// APPROVED business owned by the user. Used by /web business endpoints.
 export const requireBusinessUser = async (
   req: Request,
   res: Response,
@@ -153,10 +153,10 @@ export const requireBusinessUser = async (
       throw error;
     }
 
-    const approvedCount = await countApprovedShopsByUserId(user.id);
+    const approvedCount = await countApprovedBusinessesByUserId(user.id);
     if (approvedCount === 0) {
       const error = new Error(
-        "Shop not registered or not approved"
+        "Business not registered or not approved"
       ) as Error & { statusCode: number };
       error.statusCode = 403;
       return next(error);
