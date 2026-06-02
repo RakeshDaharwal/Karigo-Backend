@@ -4,14 +4,14 @@ import prisma from "../../config/db.conn";
 
 type ViewerRole = "USER" | "WORKER";
 
-type EnsureRoomResult =
-  | { room: { id: string; userId: string; workerId: string } }
-  | { err: string };
+type RoomLite = { id: string; userId: string; workerId: string };
+type EnsureRoomResult = { room: RoomLite } | { err: string };
+type FindRoomResult = { room: RoomLite | null } | { err: string };
 
-const ensureRoomForPair = async (
+const validatePair = async (
   customerUserId: string,
   workerRecordId: string
-): Promise<EnsureRoomResult> => {
+): Promise<{ uid: string; wid: string } | { err: string }> => {
   const uid = String(customerUserId ?? "").trim();
   const wid = String(workerRecordId ?? "").trim();
   if (!uid || !wid) return { err: "missing_user_or_worker" };
@@ -23,10 +23,35 @@ const ensureRoomForPair = async (
   if (!w) return { err: "worker_not_found" };
   if (w.userId === uid) return { err: "self_chat_forbidden" };
 
+  return { uid, wid };
+};
+
+// Returns existing room without creating; used on joinRoom so we don't
+// litter the DB with empty rooms when a user just opens a chat screen.
+const findRoomForPair = async (
+  customerUserId: string,
+  workerRecordId: string
+): Promise<FindRoomResult> => {
+  const v = await validatePair(customerUserId, workerRecordId);
+  if ("err" in v) return { err: v.err };
+
+  const room = await prisma.chatRoom.findUnique({
+    where: { userId_workerId: { userId: v.uid, workerId: v.wid } },
+  });
+  return { room: room ?? null };
+};
+
+const ensureRoomForPair = async (
+  customerUserId: string,
+  workerRecordId: string
+): Promise<EnsureRoomResult> => {
+  const v = await validatePair(customerUserId, workerRecordId);
+  if ("err" in v) return { err: v.err };
+
   const room = await prisma.chatRoom.upsert({
-    where: { userId_workerId: { userId: uid, workerId: wid } },
-    create: { id: ulid(), userId: uid, workerId: wid },
-    update: { workerId: wid },
+    where: { userId_workerId: { userId: v.uid, workerId: v.wid } },
+    create: { id: ulid(), userId: v.uid, workerId: v.wid },
+    update: { workerId: v.wid },
   });
 
   return { room };
@@ -64,12 +89,23 @@ export const handleSocketConnection = (socket: Socket, io: Server) => {
         return;
       }
 
-      const ensured = await ensureRoomForPair(userId, workerId);
-      if ("err" in ensured) {
-        ack(callback, { ok: false, error: ensured.err, messages: [] });
+      const found = await findRoomForPair(userId, workerId);
+      if ("err" in found) {
+        ack(callback, { ok: false, error: found.err, messages: [] });
         return;
       }
-      const room = ensured.room;
+      const room = found.room;
+
+      if (!room) {
+        if (socket.data.prevChatRoomId) {
+          socket.leave(socket.data.prevChatRoomId);
+          socket.data.prevChatRoomId = undefined;
+        }
+        socket.data.chatRoomId = undefined;
+        socket.data.viewerRole = role;
+        ack(callback, { ok: true, roomId: null, messages: [] });
+        return;
+      }
 
       if (socket.data.prevChatRoomId && socket.data.prevChatRoomId !== room.id) {
         socket.leave(socket.data.prevChatRoomId);

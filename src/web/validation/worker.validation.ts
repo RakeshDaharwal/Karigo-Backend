@@ -12,12 +12,6 @@ export const listWorkersQuerySchema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED"], {
     message: "status must be PENDING, APPROVED or REJECTED",
   }),
-  partnerType: z
-    .preprocess(
-      (val) => (typeof val === "string" ? val.trim().toUpperCase() : val),
-      z.enum(["INDIVIDUAL", "BUSINESS"]).optional()
-    )
-    .optional(),
   search: z
     .preprocess(
       (val) => (typeof val === "string" ? val.trim() : val),

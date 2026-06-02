@@ -1,7 +1,7 @@
 import prisma from "../config/db.conn";
 
 export const findCategoryByName = (name: string) => {
-  return prisma.category.findFirst({
+  return prisma.workerCategory.findFirst({
     where: {
       name: {
         equals: name,
@@ -13,7 +13,7 @@ export const findCategoryByName = (name: string) => {
 };
 
 export const createCategory = (id: string, name: string) => {
-  return prisma.category.create({
+  return prisma.workerCategory.create({
     data: {
       id,
       name,
@@ -22,7 +22,7 @@ export const createCategory = (id: string, name: string) => {
 };
 
 export const findCategoryById = (id: string) => {
-  return prisma.category.findFirst({
+  return prisma.workerCategory.findFirst({
     where: {
       id,
       deletedAt: null,
@@ -31,7 +31,7 @@ export const findCategoryById = (id: string) => {
 };
 
 export const findCategoryByNameExcludingId = (name: string, id: string) => {
-  return prisma.category.findFirst({
+  return prisma.workerCategory.findFirst({
     where: {
       name: {
         equals: name,
@@ -46,7 +46,7 @@ export const findCategoryByNameExcludingId = (name: string, id: string) => {
 };
 
 export const updateCategoryById = (id: string, name: string) => {
-  return prisma.category.update({
+  return prisma.workerCategory.update({
     where: {
       id,
     },
@@ -57,7 +57,7 @@ export const updateCategoryById = (id: string, name: string) => {
 };
 
 export const getActiveCategories = () => {
-  return prisma.category.findMany({
+  return prisma.workerCategory.findMany({
     where: {
       deletedAt: null,
     },
@@ -68,7 +68,7 @@ export const getActiveCategories = () => {
 };
 
 export const softDeleteCategoryById = (id: string) => {
-  return prisma.category.update({
+  return prisma.workerCategory.update({
     where: {
       id,
     },

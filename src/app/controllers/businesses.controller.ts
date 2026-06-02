@@ -1,18 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import { logError, logInfo } from "../../utils/logger.utils";
 import {
-  getApprovedShopWithProductsService,
-  getMyShopsService,
-  getNearbyApprovedShopsService,
-  onboardShopService,
-} from "../services/shops.service";
+  getApprovedBusinessWithProductsService,
+  getMyBusinessesService,
+  getNearbyApprovedBusinessesService,
+  onboardBusinessService,
+} from "../services/businesses.service";
 import {
-  NearbyShopsBody,
-  OnboardShopInput,
-} from "../validation/shops.validation";
+  NearbyBusinessesBody,
+  OnboardBusinessInput,
+} from "../validation/businesses.validation";
 
-export const onboardShop = async (
-  req: Request<{}, {}, OnboardShopInput>,
+export const onboardBusiness = async (
+  req: Request<{}, {}, OnboardBusinessInput>,
   res: Response,
   next: NextFunction
 ) => {
@@ -24,26 +24,26 @@ export const onboardShop = async (
       throw error;
     }
 
-    const created = await onboardShopService(user.userId, req.body, req.file);
+    const created = await onboardBusinessService(user.userId, req.body, req.file);
 
-    logInfo("Shop onboarding submitted", {
-      service: "shops",
-      event: "ONBOARD_SHOP_SUCCESS",
+    logInfo("Business onboarding submitted", {
+      service: "businesses",
+      event: "ONBOARD_BUSINESS_SUCCESS",
       userId: user.userId,
-      shopId: created.id,
+      businessId: created.id,
       path: req.path,
     });
 
     return res.status(201).json({
       success: true,
       statusCode: 201,
-      message: "Shop submitted for review",
+      message: "Business submitted for review",
       data: created,
     });
   } catch (error: any) {
-    logError("Shop onboarding failed", {
-      service: "shops",
-      event: "ONBOARD_SHOP_FAILED",
+    logError("Business onboarding failed", {
+      service: "businesses",
+      event: "ONBOARD_BUSINESS_FAILED",
       userId: (req as any)?.user?.userId,
       path: req.path,
       error: error.message,
@@ -53,7 +53,7 @@ export const onboardShop = async (
   }
 };
 
-export const getMyShops = async (
+export const getMyBusinesses = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -66,18 +66,18 @@ export const getMyShops = async (
       throw error;
     }
 
-    const shops = await getMyShopsService(user.userId);
+    const businesses = await getMyBusinessesService(user.userId);
 
     return res.status(200).json({
       success: true,
       statusCode: 200,
-      message: shops.length ? "Shops fetched" : "No shop onboarded yet",
-      data: shops,
+      message: businesses.length ? "Businesses fetched" : "No business onboarded yet",
+      data: businesses,
     });
   } catch (error: any) {
-    logError("Get my shops failed", {
-      service: "shops",
-      event: "GET_MY_SHOPS_FAILED",
+    logError("Get my businesses failed", {
+      service: "businesses",
+      event: "GET_MY_BUSINESSES_FAILED",
       userId: (req as any)?.user?.userId,
       path: req.path,
       error: error.message,
@@ -87,8 +87,8 @@ export const getMyShops = async (
   }
 };
 
-export const getShopDetails = async (
-  req: Request<{ shopId: string }>,
+export const getBusinessDetails = async (
+  req: Request<{ businessId: string }>,
   res: Response,
   next: NextFunction
 ) => {
@@ -100,27 +100,27 @@ export const getShopDetails = async (
       throw error;
     }
 
-    const { shopId } = req.params;
-    if (!shopId) {
-      const error = new Error("shopId is required") as Error & {
+    const { businessId } = req.params;
+    if (!businessId) {
+      const error = new Error("businessId is required") as Error & {
         statusCode: number;
       };
       error.statusCode = 400;
       throw error;
     }
 
-    const data = await getApprovedShopWithProductsService(shopId);
+    const data = await getApprovedBusinessWithProductsService(businessId);
 
     const productCount = data.stores.reduce(
       (acc, s) => acc + s.products.length,
       0
     );
 
-    logInfo("Shop details fetched", {
-      service: "shops",
-      event: "GET_SHOP_DETAILS_SUCCESS",
+    logInfo("Business details fetched", {
+      service: "businesses",
+      event: "GET_BUSINESS_DETAILS_SUCCESS",
       userId: user.userId,
-      shopId,
+      businessId,
       storeCount: data.stores.length,
       productCount,
       path: req.path,
@@ -129,15 +129,15 @@ export const getShopDetails = async (
     return res.status(200).json({
       success: true,
       statusCode: 200,
-      message: "Shop fetched",
+      message: "Business fetched",
       data,
     });
   } catch (error: any) {
-    logError("Shop details failed", {
-      service: "shops",
-      event: "GET_SHOP_DETAILS_FAILED",
+    logError("Business details failed", {
+      service: "businesses",
+      event: "GET_BUSINESS_DETAILS_FAILED",
       userId: (req as any)?.user?.userId,
-      shopId: (req as any)?.params?.shopId,
+      businessId: (req as any)?.params?.businessId,
       path: req.path,
       error: error.message,
     });
@@ -146,8 +146,8 @@ export const getShopDetails = async (
   }
 };
 
-export const getNearbyShops = async (
-  req: Request<{}, {}, NearbyShopsBody>,
+export const getNearbyBusinesses = async (
+  req: Request<{}, {}, NearbyBusinessesBody>,
   res: Response,
   next: NextFunction
 ) => {
@@ -160,26 +160,26 @@ export const getNearbyShops = async (
     }
 
     const { latitude, longitude } = req.body;
-    const data = await getNearbyApprovedShopsService(latitude, longitude);
+    const data = await getNearbyApprovedBusinessesService(latitude, longitude);
 
-    logInfo("Nearby shops fetched", {
-      service: "shops",
-      event: "GET_NEARBY_SHOPS_SUCCESS",
+    logInfo("Nearby businesses fetched", {
+      service: "businesses",
+      event: "GET_NEARBY_BUSINESSES_SUCCESS",
       userId: user.userId,
-      count: data.shops.length,
+      count: data.businesses.length,
       path: req.path,
     });
 
     return res.status(200).json({
       success: true,
       statusCode: 200,
-      message: data.shops.length ? "Shops fetched" : "No shops near you",
+      message: data.businesses.length ? "Businesses fetched" : "No businesses near you",
       data,
     });
   } catch (error: any) {
-    logError("Nearby shops failed", {
-      service: "shops",
-      event: "GET_NEARBY_SHOPS_FAILED",
+    logError("Nearby businesses failed", {
+      service: "businesses",
+      event: "GET_NEARBY_BUSINESSES_FAILED",
       userId: (req as any)?.user?.userId,
       path: req.path,
       error: error.message,

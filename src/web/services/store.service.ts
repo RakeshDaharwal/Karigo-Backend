@@ -12,7 +12,7 @@ import {
   listProductsByStore,
   updateProduct,
 } from "../../repositories/product.repository";
-import { findApprovedShopsByUserId } from "../../repositories/shop.repository";
+import { findApprovedBusinessesByUserId } from "../../repositories/business.repository";
 import { parseProductsCsv } from "../../utils/csv.utils";
 import { uploadImageBuffer } from "../../utils/cloudinary.utils";
 import {
@@ -55,12 +55,12 @@ export const createStoreService = async (
   body: CreateStoreInput,
   csvFile?: Express.Multer.File
 ) => {
-  // Auto-link the new store to the user's approved shop. If multiple shops are
-  // approved for this user we pick the most recently approved one.
-  const approvedShops = await findApprovedShopsByUserId(userId);
-  const shop = approvedShops[0];
-  if (!shop) {
-    throw httpError("No approved shop found for this user", 404);
+  // Auto-link the new store to the user's approved business. If multiple
+  // businesses are approved for this user we pick the most recently approved one.
+  const approvedBusinesses = await findApprovedBusinessesByUserId(userId);
+  const business = approvedBusinesses[0];
+  if (!business) {
+    throw httpError("No approved business found for this user", 404);
   }
 
   const storeId = ulid();
@@ -68,7 +68,7 @@ export const createStoreService = async (
   await createStore({
     id: storeId,
     userId,
-    shopId: shop.id,
+    businessId: business.id,
     name: body.name,
     description: body.description ?? null,
     openTime: body.openTime ?? null,

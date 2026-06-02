@@ -2,26 +2,13 @@ import { z } from "zod";
 
 const trimString = (val: unknown) => (typeof val === "string" ? val.trim() : val);
 
-export const SHOP_CATEGORY_VALUES = [
-  "FOOD",
-  "GROCERY",
-  "HARDWARE",
-  "PHARMACY",
-  "ELECTRONICS",
-  "CLOTHING",
-  "SALON",
-  "RESTAURANT",
-  "STATIONERY",
-  "OTHER",
-] as const;
-
-export const onboardShopSchema = z.object({
+export const onboardBusinessSchema = z.object({
   name: z.preprocess(
     trimString,
     z
       .string()
-      .min(2, "Shop name must be at least 2 characters")
-      .max(120, "Shop name must be under 120 characters")
+      .min(2, "Business name must be at least 2 characters")
+      .max(120, "Business name must be under 120 characters")
   ),
   description: z.preprocess(
     trimString,
@@ -30,11 +17,16 @@ export const onboardShopSchema = z.object({
       .min(10, "Description must be at least 10 characters")
       .max(500, "Description must be under 500 characters")
   ),
-  category: z.preprocess(
-    (val) => (typeof val === "string" ? val.trim().toUpperCase() : val),
-    z.enum(SHOP_CATEGORY_VALUES, {
-      message: "Please select a valid shop category",
-    })
+  categoryId: z.preprocess(
+    trimString,
+    z
+      .string()
+      .refine(
+        (v) =>
+          /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(v) ||
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
+        "Please select a valid business category"
+      )
   ),
   contactPhone: z.preprocess(
     trimString,
@@ -46,9 +38,9 @@ export const onboardShopSchema = z.object({
   ),
 });
 
-export type OnboardShopInput = z.infer<typeof onboardShopSchema>;
+export type OnboardBusinessInput = z.infer<typeof onboardBusinessSchema>;
 
-export const nearbyShopsBodySchema = z.object({
+export const nearbyBusinessesBodySchema = z.object({
   latitude: z.number().refine((v) => v >= -90 && v <= 90, {
     message: "latitude must be between -90 and 90",
   }),
@@ -57,4 +49,4 @@ export const nearbyShopsBodySchema = z.object({
   }),
 });
 
-export type NearbyShopsBody = z.infer<typeof nearbyShopsBodySchema>;
+export type NearbyBusinessesBody = z.infer<typeof nearbyBusinessesBodySchema>;

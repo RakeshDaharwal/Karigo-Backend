@@ -14,6 +14,7 @@ type WorkerDistanceRow = {
   longitude: number | null;
   categoryId: string;
   subCategoryIds: string[];
+  experienceYears: number | null;
   distance_km: number;
 };
 
@@ -51,6 +52,7 @@ export const getApprovedWorkersByCategoryNearby = async (
         w.longitude,
         w."categoryId",
         w."subCategoryIds",
+        w."experienceYears",
         (
           6371 * acos(
             LEAST(1::double precision, GREATEST(-1::double precision,
@@ -73,7 +75,7 @@ export const getApprovedWorkersByCategoryNearby = async (
   const subCategories =
     allSubIds.length === 0
       ? []
-      : await prisma.subCategory.findMany({
+      : await prisma.workerSubCategory.findMany({
           where: {
             id: { in: allSubIds },
             deletedAt: null,
@@ -109,7 +111,7 @@ export const getApprovedWorkersByCategoryNearby = async (
         name: subById.get(id) ?? null,
       })),
       rating: null,
-      experienceYears: null,
+      experienceYears: row.experienceYears,
     };
   });
 

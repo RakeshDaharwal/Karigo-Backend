@@ -1,5 +1,5 @@
 import prisma from "../../config/db.conn";
-import { PartnerType, Role } from "../../generated/prisma/enums";
+import { Role } from "../../generated/prisma/enums";
 import {
   countWorkerStatuses,
   findSubCategoriesByIds,
@@ -14,7 +14,6 @@ export const getWorkerStatsService = async () => {
 
 export const listWorkersService = async (params: {
   status: WorkerStatus;
-  partnerType?: PartnerType;
   search?: string;
 }) => {
   const workers = await listWorkersByFilters(params);
@@ -26,8 +25,6 @@ export const listWorkersService = async (params: {
     fullName: [w.firstName, w.lastName].filter(Boolean).join(" ").trim() || null,
     mobile: w.mobile,
     branch: w.branch,
-    partnerType: w.partnerType,
-    businessName: w.businessName,
     profileImage: w.profileImage,
     status: w.status,
     createdAt: w.createdAt,
@@ -52,8 +49,6 @@ export const getWorkerDetailsService = async (workerId: string) => {
   return {
     id: worker.id,
     status: worker.status,
-    partnerType: worker.partnerType,
-    businessName: worker.businessName,
     firstName: worker.firstName,
     lastName: worker.lastName,
     fullName:
@@ -67,6 +62,7 @@ export const getWorkerDetailsService = async (workerId: string) => {
     longitude: worker.longitude,
     profileImage: worker.profileImage,
     aadhaarImageUrl: worker.aadhaarImageUrl,
+    experienceYears: worker.experienceYears,
     createdAt: worker.createdAt,
     updatedAt: worker.updatedAt,
     category: worker.category,

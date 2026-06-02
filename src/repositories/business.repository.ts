@@ -1,21 +1,20 @@
 import prisma from "../config/db.conn";
-import { ShopCategory } from "../generated/prisma/enums";
 
-export type ShopStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type BusinessStatus = "PENDING" | "APPROVED" | "REJECTED";
 
-export type ListShopsFilters = {
-  status: ShopStatus;
-  category?: ShopCategory;
+export type ListBusinessesFilters = {
+  status: BusinessStatus;
+  categoryId?: string;
   search?: string;
 };
 
-const buildWhere = (filters: ListShopsFilters) => {
+const buildWhere = (filters: ListBusinessesFilters) => {
   const where: Record<string, unknown> = {
     status: filters.status,
   };
 
-  if (filters.category) {
-    where.category = filters.category;
+  if (filters.categoryId) {
+    where.categoryId = filters.categoryId;
   }
 
   const term = filters.search?.trim();
@@ -30,8 +29,8 @@ const buildWhere = (filters: ListShopsFilters) => {
   return where;
 };
 
-export const listShopsByFilters = (filters: ListShopsFilters) => {
-  return prisma.shop.findMany({
+export const listBusinessesByFilters = (filters: ListBusinessesFilters) => {
+  return prisma.business.findMany({
     where: buildWhere(filters),
     include: {
       user: {
@@ -42,22 +41,25 @@ export const listShopsByFilters = (filters: ListShopsFilters) => {
           lastName: true,
         },
       },
+      category: {
+        select: { id: true, name: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 };
 
-export const countShopStatuses = async () => {
+export const countBusinessStatuses = async () => {
   const [approved, pending, rejected] = await Promise.all([
-    prisma.shop.count({ where: { status: "APPROVED" } }),
-    prisma.shop.count({ where: { status: "PENDING" } }),
-    prisma.shop.count({ where: { status: "REJECTED" } }),
+    prisma.business.count({ where: { status: "APPROVED" } }),
+    prisma.business.count({ where: { status: "PENDING" } }),
+    prisma.business.count({ where: { status: "REJECTED" } }),
   ]);
   return { approved, pending, rejected };
 };
 
-export const findShopByIdDetailed = (id: string) => {
-  return prisma.shop.findUnique({
+export const findBusinessByIdDetailed = (id: string) => {
+  return prisma.business.findUnique({
     where: { id },
     include: {
       user: {
@@ -70,19 +72,25 @@ export const findShopByIdDetailed = (id: string) => {
           createdAt: true,
         },
       },
+      category: {
+        select: { id: true, name: true },
+      },
     },
   });
 };
 
-export const findApprovedShopsByUserId = (userId: string) => {
-  return prisma.shop.findMany({
+export const findApprovedBusinessesByUserId = (userId: string) => {
+  return prisma.business.findMany({
     where: { userId, status: "APPROVED" },
     orderBy: { createdAt: "desc" },
+    include: {
+      category: { select: { id: true, name: true } },
+    },
   });
 };
 
-export const countApprovedShopsByUserId = (userId: string) => {
-  return prisma.shop.count({
+export const countApprovedBusinessesByUserId = (userId: string) => {
+  return prisma.business.count({
     where: { userId, status: "APPROVED" },
   });
 };

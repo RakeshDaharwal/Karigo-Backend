@@ -65,7 +65,6 @@ export const listWorkers = async (
       service: "worker",
       event: "LIST_WORKERS_SUCCESS",
       status: parsed.data.status,
-      partnerType: parsed.data.partnerType,
       path: req.path,
     });
 

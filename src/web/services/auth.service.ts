@@ -4,9 +4,9 @@ import { env } from "../../config/env";
 import { Role } from "../../generated/prisma/enums";
 import { findUserByMobile } from "../../repositories/user.repository";
 import {
-  countApprovedShopsByUserId,
-  findApprovedShopsByUserId,
-} from "../../repositories/shop.repository";
+  countApprovedBusinessesByUserId,
+  findApprovedBusinessesByUserId,
+} from "../../repositories/business.repository";
 import {
   deleteOtpRecord,
   getOtpRecord,
@@ -222,7 +222,7 @@ export const getSuperAdminProfileService = async (userId: string) => {
   return user;
 };
 
-// Business login - user must exist AND have at least one APPROVED shop.
+// Business login - user must exist AND have at least one APPROVED business.
 export const businessLoginService = async (mobile: string, ip: string) => {
   const user = await findUserByMobile(mobile);
 
@@ -234,11 +234,11 @@ export const businessLoginService = async (mobile: string, ip: string) => {
     throw error;
   }
 
-  const approvedCount = await countApprovedShopsByUserId(user.id);
+  const approvedCount = await countApprovedBusinessesByUserId(user.id);
 
   if (approvedCount === 0) {
     const error = new Error(
-      "Shop not registered. Please register your shop on the Karigo app first."
+      "Business not registered. Please register your business on the Karigo app first."
     ) as Error & { statusCode: number };
     error.statusCode = 403;
     throw error;
@@ -263,11 +263,11 @@ export const verifyBusinessOtpService = async (mobile: string, otp: string) => {
     throw error;
   }
 
-  const approvedShops = await findApprovedShopsByUserId(user.id);
+  const approvedBusinesses = await findApprovedBusinessesByUserId(user.id);
 
-  if (approvedShops.length === 0) {
+  if (approvedBusinesses.length === 0) {
     const error = new Error(
-      "Shop not registered. Please register your shop on the Karigo app first."
+      "Business not registered. Please register your business on the Karigo app first."
     ) as Error & { statusCode: number };
     error.statusCode = 403;
     throw error;
@@ -288,13 +288,13 @@ export const verifyBusinessOtpService = async (mobile: string, otp: string) => {
       isVerified: user.isVerified,
       isProfileCompleted: user.isProfileCompleted,
     },
-    shops: approvedShops.map((s) => ({
-      id: s.id,
-      name: s.name,
-      category: s.category,
-      logoUrl: s.logoUrl,
-      branch: s.branch,
-      status: s.status,
+    businesses: approvedBusinesses.map((b) => ({
+      id: b.id,
+      name: b.name,
+      category: b.category ? { id: b.category.id, name: b.category.name } : null,
+      logoUrl: b.logoUrl,
+      branch: b.branch,
+      status: b.status,
     })),
   };
 };
@@ -320,17 +320,17 @@ export const getBusinessProfileService = async (userId: string) => {
     throw err;
   }
 
-  const approvedShops = await findApprovedShopsByUserId(userId);
+  const approvedBusinesses = await findApprovedBusinessesByUserId(userId);
 
   return {
     ...user,
-    shops: approvedShops.map((s) => ({
-      id: s.id,
-      name: s.name,
-      category: s.category,
-      logoUrl: s.logoUrl,
-      branch: s.branch,
-      status: s.status,
+    businesses: approvedBusinesses.map((b) => ({
+      id: b.id,
+      name: b.name,
+      category: b.category ? { id: b.category.id, name: b.category.name } : null,
+      logoUrl: b.logoUrl,
+      branch: b.branch,
+      status: b.status,
     })),
   };
 };

@@ -17,6 +17,8 @@ const buildRedisOptions = (): RedisOptions => {
       password: env.upstashRedisPassword,
       tls: {},
       maxRetriesPerRequest: 3,
+      connectTimeout: 10_000,
+      commandTimeout: 8_000,
     };
   }
 
@@ -26,6 +28,8 @@ const buildRedisOptions = (): RedisOptions => {
     username: env.redisUsername || undefined,
     password: env.redisPassword || undefined,
     db: env.redisDb,
+    connectTimeout: 10_000,
+    commandTimeout: 8_000,
   };
 };
 

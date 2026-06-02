@@ -4,7 +4,7 @@ export const findSubCategoryByNameAndCategoryId = (
   categoryId: string,
   name: string
 ) => {
-  return prisma.subCategory.findFirst({
+  return prisma.workerSubCategory.findFirst({
     where: {
       categoryId,
       name: {
@@ -21,7 +21,7 @@ export const findSubCategoryByNameAndCategoryIdExcludingId = (
   name: string,
   id: string
 ) => {
-  return prisma.subCategory.findFirst({
+  return prisma.workerSubCategory.findFirst({
     where: {
       categoryId,
       name: {
@@ -35,7 +35,7 @@ export const findSubCategoryByNameAndCategoryIdExcludingId = (
 };
 
 export const findSubCategoryById = (id: string) => {
-  return prisma.subCategory.findFirst({
+  return prisma.workerSubCategory.findFirst({
     where: {
       id,
       deletedAt: null,
@@ -44,7 +44,7 @@ export const findSubCategoryById = (id: string) => {
 };
 
 export const createSubCategory = (id: string, categoryId: string, name: string) => {
-  return prisma.subCategory.create({
+  return prisma.workerSubCategory.create({
     data: {
       id,
       categoryId,
@@ -54,21 +54,21 @@ export const createSubCategory = (id: string, categoryId: string, name: string) 
 };
 
 export const updateSubCategoryById = (id: string, name: string) => {
-  return prisma.subCategory.update({
+  return prisma.workerSubCategory.update({
     where: { id },
     data: { name },
   });
 };
 
 export const softDeleteSubCategoryById = (id: string) => {
-  return prisma.subCategory.update({
+  return prisma.workerSubCategory.update({
     where: { id },
     data: { deletedAt: new Date() },
   });
 };
 
 export const findSubCategoriesByCategoryId = (categoryId: string) => {
-  return prisma.subCategory.findMany({
+  return prisma.workerSubCategory.findMany({
     where: {
       categoryId,
       deletedAt: null,

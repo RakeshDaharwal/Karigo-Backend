@@ -25,7 +25,7 @@ export const env = {
   upstashRedisPassword: process.env.UPSTASH_REDIS_PASSWORD || "",
   port: toNumber(process.env.PORT, 5004),
   NODE_ENV,
-  otpTtlSeconds: toNumber(process.env.OTP_TTL_SECONDS, 300),
+  otpTtlSeconds: toNumber(process.env.OTP_TTL_SECONDS, 120),
   otpCooldownSeconds: toNumber(process.env.OTP_COOLDOWN_SECONDS, 30),
   otpMobileLimitMax: toNumber(process.env.OTP_MOBILE_LIMIT_MAX, 5),
   otpMobileLimitWindowSeconds: toNumber(

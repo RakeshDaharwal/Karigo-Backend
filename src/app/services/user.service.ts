@@ -1,6 +1,5 @@
 import { ulid } from "ulid";
 import prisma from "../../config/db.conn";
-import { PartnerType } from "../../generated/prisma/enums";
 import { findCategoryById } from "../../repositories/category.repository";
 import { uploadImageBuffer } from "../../utils/cloudinary.utils";
 import { UpdateBranchInput, UploadProfileInput } from "../validation/user.validation";
@@ -98,19 +97,11 @@ export const getMyProfessionalProfileService = async (userId: string) => {
     return null;
   }
 
-  const subIds = worker.subCategoryIds ?? [];
-  const subs = subIds.length
-    ? await prisma.subCategory.findMany({
-        where: { id: { in: subIds }, deletedAt: null },
-        select: { id: true, name: true },
-      })
-    : [];
-
   return {
     id: worker.id,
     status: worker.status,
     category: { id: worker.category.id, name: worker.category.name },
-    subCategories: subs,
+    experienceYears: worker.experienceYears,
     aadhaarImageUrl: worker.aadhaarImageUrl,
     profileImage: worker.profileImage,
     createdAt: worker.createdAt,
@@ -120,10 +111,8 @@ export const getMyProfessionalProfileService = async (userId: string) => {
 export const joinKarigoProfessionalService = async (
   userId: string,
   categoryId: string,
-  subCategoryIds: string[],
-  partnerType: "INDIVIDUAL" | "BUSINESS",
-  businessName: string | null,
-  file?: Express.Multer.File
+  experienceYears: number,
+  file: Express.Multer.File
 ) => {
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },
@@ -164,43 +153,21 @@ export const joinKarigoProfessionalService = async (
     throw err;
   }
 
-  const uniqueIds = [...new Set(subCategoryIds)];
-  const subs = await prisma.subCategory.findMany({
-    where: {
-      id: { in: uniqueIds },
-      categoryId,
-      deletedAt: null,
-    },
-  });
-
-  if (subs.length !== uniqueIds.length) {
-    const err = new Error(
-      "One or more skills are invalid for this category"
-    ) as Error & { statusCode: number };
-    err.statusCode = 400;
-    throw err;
-  }
-
-  let aadhaarImageUrl: string | null = null;
-
   console.log("[users.service] joinKarigoProfessional", {
     userId,
-    hasFile: Boolean(file),
-    fileSize: file?.size,
-    fileMime: file?.mimetype,
-    bufferBytes: file?.buffer?.length,
+    fileSize: file.size,
+    fileMime: file.mimetype,
+    bufferBytes: file.buffer?.length,
   });
 
-  if (file) {
-    const workerScopeId = ulid();
-    const uploaded = await uploadImageBuffer(
-      file.buffer,
-      "workers/aadhaar",
-      `worker_${userId}_${workerScopeId}`,
-    );
-    aadhaarImageUrl = uploaded.url;
-    console.log("[users.service] aadhaar uploaded", { userId, url: aadhaarImageUrl });
-  }
+  const workerScopeId = ulid();
+  const uploaded = await uploadImageBuffer(
+    file.buffer,
+    "workers/aadhaar",
+    `worker_${userId}_${workerScopeId}`,
+  );
+  const aadhaarImageUrl = uploaded.url;
+  console.log("[users.service] aadhaar uploaded", { userId, url: aadhaarImageUrl });
 
   const branchDetails = dbUser.branchDetails;
   const branchName =
@@ -226,10 +193,8 @@ export const joinKarigoProfessionalService = async (
       profileImage: dbUser.profileImage ?? null,
       categoryId,
       aadhaarImageUrl,
-      subCategoryIds: uniqueIds,
-      partnerType:
-        partnerType === "BUSINESS" ? PartnerType.BUSINESS : PartnerType.INDIVIDUAL,
-      businessName: partnerType === "BUSINESS" ? businessName : null,
+      subCategoryIds: [],
+      experienceYears,
       status: "PENDING",
     },
     include: {
