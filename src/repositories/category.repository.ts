@@ -12,11 +12,22 @@ export const findCategoryByName = (name: string) => {
   });
 };
 
-export const createCategory = (id: string, name: string) => {
+const nextCategorySortOrder = async () => {
+  const { _max } = await prisma.workerCategory.aggregate({
+    where: { deletedAt: null },
+    _max: { sortOrder: true },
+  });
+  return (_max.sortOrder ?? -1) + 1;
+};
+
+export const createCategory = async (id: string, name: string, iconUrl: string) => {
+  const sortOrder = await nextCategorySortOrder();
   return prisma.workerCategory.create({
     data: {
       id,
       name,
+      iconUrl,
+      sortOrder,
     },
   });
 };
@@ -62,7 +73,7 @@ export const getActiveCategories = () => {
       deletedAt: null,
     },
     orderBy: {
-      createdAt: "desc",
+      sortOrder: "asc",
     },
   });
 };
