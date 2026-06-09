@@ -222,6 +222,7 @@ model WorkerSubCategory {
   id         String         @id
   categoryId String
   name       String
+  iconUrl    String?
   sortOrder  Int?
   category   WorkerCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   createdAt  DateTime       @default(now())
