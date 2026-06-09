@@ -1,6 +1,7 @@
 import { ulid } from "ulid";
 import { findUserByMobile, upsertVerifiedUserByMobile } from "../../repositories/user.repository";
 import { generateAppAccessToken } from "../../utils/jwt.utils";
+import { sendOtpSms } from "../../utils/sms.utils";
 import { env } from "../../config/env";
 import {
   deleteOtpRecord,
@@ -20,7 +21,7 @@ const generateOtp = () => {
 };
 
 export const sendSMS = async (mobile: string, otp: string) => {
-  console.log(`Sending OTP ${otp} to mobile ${mobile}`);
+  await sendOtpSms(mobile, otp);
 };
 
 export const userLoginService = async (mobile: string, _ip: string) => {

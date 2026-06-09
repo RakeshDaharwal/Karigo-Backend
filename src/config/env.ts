@@ -41,6 +41,11 @@ export const env = {
 
   GEOAPIFY_API_KEY: process.env.GEOAPIFY_API_KEY || "",
 
+  smsBaseUrl: process.env.SMS_BASE_URL || "https://api.startmessaging.com",
+  smsApiKey: process.env.SMS_API_KEY || "",
+  smsOtpTemplateId: process.env.SMS_OTP_TEMPLATE_ID || "",
+  smsAppName: process.env.SMS_APP_NAME || "Karigo",
+
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
