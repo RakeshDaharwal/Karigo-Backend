@@ -42,7 +42,7 @@ export const userLoginService = async (mobile: string, _ip: string) => {
     await setOtpRecord(mobile, { otp: otpToSend, attempts: 0 });
   }
 
-  await sendSMS(mobile, otpToSend);
+  // await sendSMS(mobile, otpToSend);
   await setOtpCooldown(mobile);
 
   return {
