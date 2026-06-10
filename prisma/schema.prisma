@@ -142,11 +142,15 @@ model Business {
 model BusinessCategory {
   id         String     @id
   name       String
+  iconUrl    String?
+  sortOrder  Int?
   businesses Business[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
   deletedAt  DateTime?
 
+  @@index([sortOrder])
+  @@index([deletedAt])
   @@map("business_category")
   @@schema("public")
 }
