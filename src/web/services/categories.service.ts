@@ -5,6 +5,7 @@ import {
   findCategoryByName,
   findCategoryByNameExcludingId,
   getActiveCategories,
+  reorderCategories,
   softDeleteCategoryById,
   updateCategoryById,
 } from "../../repositories/category.repository";
@@ -44,7 +45,11 @@ export const createCategoryService = async (
   }
 };
 
-export const updateCategoryService = async (id: string, name: string) => {
+export const updateCategoryService = async (
+  id: string,
+  name: string,
+  iconFile?: Express.Multer.File
+) => {
   const existingCategory = await findCategoryById(id);
 
   if (!existingCategory) {
@@ -62,7 +67,13 @@ export const updateCategoryService = async (id: string, name: string) => {
   }
 
   try {
-    return await updateCategoryById(id, name);
+    let iconUrl: string | undefined;
+    if (iconFile) {
+      const uploaded = await uploadWorkerCategoryIcon(id, iconFile);
+      iconUrl = uploaded.url;
+    }
+
+    return await updateCategoryById(id, name, iconUrl);
   } catch (error: any) {
     if (error?.code === "P2002") {
       const customError = new Error("Category already exists") as Error & {
@@ -86,4 +97,39 @@ export const deleteCategoryService = async (id: string) => {
   }
 
   return softDeleteCategoryById(id);
+};
+
+export const reorderCategoriesService = async (orderedIds: string[]) => {
+  const uniqueIds = new Set(orderedIds);
+  if (uniqueIds.size !== orderedIds.length) {
+    const error = new Error("Duplicate category ids are not allowed") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const categories = await getActiveCategories();
+  const activeIds = new Set(categories.map((c) => c.id));
+
+  if (orderedIds.length !== categories.length) {
+    const error = new Error(
+      "Ordered ids must include every active category exactly once"
+    ) as Error & { statusCode: number };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  for (const id of orderedIds) {
+    if (!activeIds.has(id)) {
+      const error = new Error("One or more category ids are invalid") as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  await reorderCategories(orderedIds);
+  return getActiveCategories();
 };

@@ -69,10 +69,17 @@ export const createSubCategory = async (
   });
 };
 
-export const updateSubCategoryById = (id: string, name: string) => {
+export const updateSubCategoryById = (
+  id: string,
+  name: string,
+  iconUrl?: string
+) => {
   return prisma.workerSubCategory.update({
     where: { id },
-    data: { name },
+    data: {
+      name,
+      ...(iconUrl !== undefined ? { iconUrl } : {}),
+    },
   });
 };
 
@@ -93,4 +100,15 @@ export const findSubCategoriesByCategoryId = (categoryId: string) => {
       sortOrder: "asc",
     },
   });
+};
+
+export const reorderSubCategories = (orderedIds: string[]) => {
+  return prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.workerSubCategory.update({
+        where: { id },
+        data: { sortOrder: index },
+      })
+    )
+  );
 };

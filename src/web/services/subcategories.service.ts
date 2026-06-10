@@ -7,6 +7,7 @@ import {
   findSubCategoryById,
   findSubCategoryByNameAndCategoryId,
   findSubCategoryByNameAndCategoryIdExcludingId,
+  reorderSubCategories,
   softDeleteSubCategoryById,
   updateSubCategoryById,
 } from "../../repositories/subcategory.repository";
@@ -76,7 +77,11 @@ export const createSubCategoryService = async (
   }
 };
 
-export const updateSubCategoryService = async (id: string, name: string) => {
+export const updateSubCategoryService = async (
+  id: string,
+  name: string,
+  iconFile?: Express.Multer.File
+) => {
   const existingSubCategory = await findSubCategoryById(id);
 
   if (!existingSubCategory) {
@@ -102,7 +107,17 @@ export const updateSubCategoryService = async (id: string, name: string) => {
   }
 
   try {
-    return await updateSubCategoryById(id, name);
+    let iconUrl: string | undefined;
+    if (iconFile) {
+      const uploaded = await uploadWorkerSubCategoryIcon(
+        existingSubCategory.categoryId,
+        id,
+        iconFile
+      );
+      iconUrl = uploaded.url;
+    }
+
+    return await updateSubCategoryById(id, name, iconUrl);
   } catch (error: any) {
     if (error?.code === "P2002") {
       const customError = new Error("Subcategory already exists") as Error & {
@@ -128,4 +143,50 @@ export const deleteSubCategoryService = async (id: string) => {
   }
 
   return softDeleteSubCategoryById(id);
+};
+
+export const reorderSubCategoriesService = async (
+  categoryId: string,
+  orderedIds: string[]
+) => {
+  const category = await findCategoryById(categoryId);
+
+  if (!category) {
+    const error = new Error("Category not found") as Error & { statusCode: number };
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const uniqueIds = new Set(orderedIds);
+  if (uniqueIds.size !== orderedIds.length) {
+    const error = new Error("Duplicate subcategory ids are not allowed") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const subCategories = await findSubCategoriesByCategoryId(categoryId);
+  const activeIds = new Set(subCategories.map((s) => s.id));
+
+  if (orderedIds.length !== subCategories.length) {
+    const error = new Error(
+      "Ordered ids must include every active subcategory exactly once"
+    ) as Error & { statusCode: number };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  for (const id of orderedIds) {
+    if (!activeIds.has(id)) {
+      const error = new Error("One or more subcategory ids are invalid") as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  await reorderSubCategories(orderedIds);
+  return findSubCategoriesByCategoryId(categoryId);
 };

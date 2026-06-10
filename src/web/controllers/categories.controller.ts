@@ -4,11 +4,13 @@ import {
   createCategoryService,
   deleteCategoryService,
   getCategoriesService,
+  reorderCategoriesService,
   updateCategoryService,
 } from "../services/categories.service";
 import {
   categoryIdSchema,
   CreateCategoryInput,
+  ReorderCategoriesInput,
   UpdateCategoryInput,
 } from "../validation/categories.validation";
 
@@ -97,7 +99,7 @@ export const updateCategory = async (
 
     const categoryId = parsedCategoryId.data.id;
     const { name } = req.body;
-    const category = await updateCategoryService(categoryId, name);
+    const category = await updateCategoryService(categoryId, name, req.file);
 
     logInfo("Category updated successfully", {
       service: "categories",
@@ -119,6 +121,40 @@ export const updateCategory = async (
       event: "UPDATE_CATEGORY_FAILED",
       categoryId: req.params?.id,
       name: req.body?.name,
+      path: req.path,
+      error: error.message,
+    });
+
+    next(error);
+  }
+};
+
+export const reorderCategories = async (
+  req: Request<{}, {}, ReorderCategoriesInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { orderedIds } = req.body;
+    const categories = await reorderCategoriesService(orderedIds);
+
+    logInfo("Categories reordered successfully", {
+      service: "categories",
+      event: "REORDER_CATEGORIES_SUCCESS",
+      count: orderedIds.length,
+      path: req.path,
+    });
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Categories reordered successfully",
+      data: categories,
+    });
+  } catch (error: any) {
+    logError("Category reorder failed", {
+      service: "categories",
+      event: "REORDER_CATEGORIES_FAILED",
       path: req.path,
       error: error.message,
     });

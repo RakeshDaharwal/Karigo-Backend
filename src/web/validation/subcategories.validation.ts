@@ -34,5 +34,15 @@ export const updateSubCategorySchema = z.object({
     .refine((value) => value.length >= 2, "Subcategory name is required"),
 });
 
+export const reorderSubCategoriesSchema = z.object({
+  categoryId: idSchema,
+  orderedIds: z
+    .array(idSchema)
+    .min(1, "At least one subcategory id is required"),
+});
+
 export type CreateSubCategoryInput = z.infer<typeof createSubCategorySchema>;
 export type UpdateSubCategoryInput = z.infer<typeof updateSubCategorySchema>;
+export type ReorderSubCategoriesInput = z.infer<
+  typeof reorderSubCategoriesSchema
+>;

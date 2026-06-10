@@ -56,13 +56,18 @@ export const findCategoryByNameExcludingId = (name: string, id: string) => {
   });
 };
 
-export const updateCategoryById = (id: string, name: string) => {
+export const updateCategoryById = (
+  id: string,
+  name: string,
+  iconUrl?: string
+) => {
   return prisma.workerCategory.update({
     where: {
       id,
     },
     data: {
       name,
+      ...(iconUrl !== undefined ? { iconUrl } : {}),
     },
   });
 };
@@ -87,4 +92,15 @@ export const softDeleteCategoryById = (id: string) => {
       deletedAt: new Date(),
     },
   });
+};
+
+export const reorderCategories = (orderedIds: string[]) => {
+  return prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.workerCategory.update({
+        where: { id },
+        data: { sortOrder: index },
+      })
+    )
+  );
 };

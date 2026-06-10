@@ -10,10 +10,12 @@ import {
   createSubCategory,
   deleteSubCategory,
   listSubCategoriesByCategoryId,
+  reorderSubCategories,
   updateSubCategory,
 } from "../controllers/subcategories.controller";
 import {
   createSubCategorySchema,
+  reorderSubCategoriesSchema,
   updateSubCategorySchema,
 } from "../validation/subcategories.validation";
 
@@ -44,12 +46,25 @@ router.put(
   "/edit/:id",
   categoriesRateLimit,
   requireSuperAdmin,
+  uploadSubCategoryIcon,
   validate(
     updateSubCategorySchema,
     "UPDATE_SUBCATEGORY_VALIDATION_FAILED",
     "subcategories"
   ),
   updateSubCategory
+);
+
+router.put(
+  "/reorder",
+  categoriesRateLimit,
+  requireSuperAdmin,
+  validate(
+    reorderSubCategoriesSchema,
+    "REORDER_SUBCATEGORIES_VALIDATION_FAILED",
+    "subcategories"
+  ),
+  reorderSubCategories
 );
 
 router.delete(

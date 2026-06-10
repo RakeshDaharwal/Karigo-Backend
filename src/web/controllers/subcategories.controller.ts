@@ -4,11 +4,13 @@ import {
   createSubCategoryService,
   deleteSubCategoryService,
   getSubCategoriesByCategoryIdService,
+  reorderSubCategoriesService,
   updateSubCategoryService,
 } from "../services/subcategories.service";
 import {
   categoryIdParamSchema,
   CreateSubCategoryInput,
+  ReorderSubCategoriesInput,
   subCategoryIdSchema,
   UpdateSubCategoryInput,
 } from "../validation/subcategories.validation";
@@ -117,7 +119,11 @@ export const updateSubCategory = async (
 
     const subCategoryId = parsedId.data.id;
     const { name } = req.body;
-    const subCategory = await updateSubCategoryService(subCategoryId, name);
+    const subCategory = await updateSubCategoryService(
+      subCategoryId,
+      name,
+      req.file
+    );
 
     logInfo("Subcategory updated successfully", {
       service: "subcategories",
@@ -139,6 +145,42 @@ export const updateSubCategory = async (
       event: "UPDATE_SUBCATEGORY_FAILED",
       subCategoryId: req.params?.id,
       name: req.body?.name,
+      path: req.path,
+      error: error.message,
+    });
+
+    next(error);
+  }
+};
+
+export const reorderSubCategories = async (
+  req: Request<object, object, ReorderSubCategoriesInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { categoryId, orderedIds } = req.body;
+    const data = await reorderSubCategoriesService(categoryId, orderedIds);
+
+    logInfo("Subcategories reordered successfully", {
+      service: "subcategories",
+      event: "REORDER_SUBCATEGORIES_SUCCESS",
+      categoryId,
+      count: orderedIds.length,
+      path: req.path,
+    });
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Subcategories reordered successfully",
+      data,
+    });
+  } catch (error: any) {
+    logError("Subcategory reorder failed", {
+      service: "subcategories",
+      event: "REORDER_SUBCATEGORIES_FAILED",
+      categoryId: req.body?.categoryId,
       path: req.path,
       error: error.message,
     });
