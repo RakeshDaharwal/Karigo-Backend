@@ -1,5 +1,6 @@
 import prisma from "../../config/db.conn";
 import { generateAppAccessToken } from "../../utils/jwt.utils";
+import { sendOtpSms } from "../../utils/sms.utils";
 import { env } from "../../config/env";
 import { Role } from "../../generated/prisma/enums";
 import { findUserByMobile } from "../../repositories/user.repository";
@@ -109,7 +110,7 @@ const generateOtp = () => {
 };
 
 export const sendSMS = async (mobile: string, otp: string) => {
-  console.log(`Sending OTP ${otp} to mobile ${mobile}`);
+  await sendOtpSms(mobile, otp);
 };
 
 // Generates and persists (or reuses) an OTP, then "sends" it via SMS.

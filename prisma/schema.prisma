@@ -142,11 +142,15 @@ model Business {
 model BusinessCategory {
   id         String     @id
   name       String
+  iconUrl    String?
+  sortOrder  Int?
   businesses Business[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
   deletedAt  DateTime?
 
+  @@index([sortOrder])
+  @@index([deletedAt])
   @@map("business_category")
   @@schema("public")
 }
@@ -204,12 +208,16 @@ model Vehicle {
 model WorkerCategory {
   id            String              @id
   name          String
+  iconUrl       String?
+  sortOrder     Int?
   subCategories WorkerSubCategory[]
   workers       Worker[]
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   deletedAt     DateTime?
 
+  @@index([sortOrder])
+  @@index([deletedAt])
   @@map("worker_category")
   @@schema("public")
 }
@@ -218,11 +226,16 @@ model WorkerSubCategory {
   id         String         @id
   categoryId String
   name       String
-  category   WorkerCategory @relation(fields: [categoryId], references: [id])
+  iconUrl    String?
+  sortOrder  Int?
+  category   WorkerCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   deletedAt  DateTime?
 
+  @@index([categoryId])
+  @@index([categoryId, sortOrder])
+  @@index([deletedAt])
   @@map("worker_subcategory")
   @@schema("public")
 }

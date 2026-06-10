@@ -1,9 +1,8 @@
 import { Router } from "express";
 import authRoutes from "./routes/auth.routes";
 import workerRoutes from "./routes/worker.routes";
-import categoriesRoutes, {
-  subcategoriesRoutes,
-} from "./routes/categories.routes";
+import categoriesRoutes from "./routes/categories.routes";
+import subcategoriesRoutes from "./routes/subcategories.routes";
 import businessCategoriesRoutes from "./routes/business_categories.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 import businessRoutes from "./routes/business.routes";

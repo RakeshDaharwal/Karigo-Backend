@@ -111,3 +111,37 @@ export const uploadImageBuffer = async (
     uploadStream.end(buffer);
   });
 };
+
+export const uploadWorkerCategoryIcon = async (
+  categoryId: string,
+  file: Express.Multer.File,
+): Promise<CloudinaryUploadResult> => {
+  return uploadImageBuffer(
+    file.buffer,
+    "worker-categories/icons",
+    `category_${categoryId}`,
+  );
+};
+
+export const uploadBusinessCategoryIcon = async (
+  categoryId: string,
+  file: Express.Multer.File,
+): Promise<CloudinaryUploadResult> => {
+  return uploadImageBuffer(
+    file.buffer,
+    "business-categories/icons",
+    `category_${categoryId}`,
+  );
+};
+
+export const uploadWorkerSubCategoryIcon = async (
+  categoryId: string,
+  subCategoryId: string,
+  file: Express.Multer.File,
+): Promise<CloudinaryUploadResult> => {
+  return uploadImageBuffer(
+    file.buffer,
+    `worker-categories/${categoryId}/subcategory-icons`,
+    `subcategory_${subCategoryId}`,
+  );
+};

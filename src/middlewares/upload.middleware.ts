@@ -124,6 +124,46 @@ export const uploadProductImage = withUploadErrorHandler(
   "product-image",
 );
 
+export const uploadCategoryIcon = withUploadErrorHandler(
+  baseUploader.single("icon"),
+  "category-icon",
+);
+
+export const requireCategoryIcon = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      statusCode: 400,
+      message: "Category icon is required",
+    });
+  }
+  next();
+};
+
+export const uploadSubCategoryIcon = withUploadErrorHandler(
+  baseUploader.single("icon"),
+  "subcategory-icon",
+);
+
+export const requireSubCategoryIcon = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      statusCode: 400,
+      message: "Subcategory icon is required",
+    });
+  }
+  next();
+};
+
 const CSV_ALLOWED_TYPES = [
   "text/csv",
   "application/csv",

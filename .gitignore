@@ -17,3 +17,5 @@ src/generated/
 # logs
 logs
 *.log
+
+docs/

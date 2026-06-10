@@ -12,11 +12,22 @@ export const findCategoryByName = (name: string) => {
   });
 };
 
-export const createCategory = (id: string, name: string) => {
+const nextCategorySortOrder = async () => {
+  const { _max } = await prisma.workerCategory.aggregate({
+    where: { deletedAt: null },
+    _max: { sortOrder: true },
+  });
+  return (_max.sortOrder ?? -1) + 1;
+};
+
+export const createCategory = async (id: string, name: string, iconUrl: string) => {
+  const sortOrder = await nextCategorySortOrder();
   return prisma.workerCategory.create({
     data: {
       id,
       name,
+      iconUrl,
+      sortOrder,
     },
   });
 };
@@ -45,13 +56,18 @@ export const findCategoryByNameExcludingId = (name: string, id: string) => {
   });
 };
 
-export const updateCategoryById = (id: string, name: string) => {
+export const updateCategoryById = (
+  id: string,
+  name: string,
+  iconUrl?: string
+) => {
   return prisma.workerCategory.update({
     where: {
       id,
     },
     data: {
       name,
+      ...(iconUrl !== undefined ? { iconUrl } : {}),
     },
   });
 };
@@ -62,7 +78,7 @@ export const getActiveCategories = () => {
       deletedAt: null,
     },
     orderBy: {
-      createdAt: "desc",
+      sortOrder: "asc",
     },
   });
 };
@@ -76,4 +92,21 @@ export const softDeleteCategoryById = (id: string) => {
       deletedAt: new Date(),
     },
   });
+};
+
+export const reorderCategories = (orderedIds: string[]) => {
+  return prisma.$transaction([
+    ...orderedIds.map((id, index) =>
+      prisma.workerCategory.update({
+        where: { id },
+        data: { sortOrder: -(index + 1) },
+      })
+    ),
+    ...orderedIds.map((id, index) =>
+      prisma.workerCategory.update({
+        where: { id },
+        data: { sortOrder: index },
+      })
+    ),
+  ]);
 };

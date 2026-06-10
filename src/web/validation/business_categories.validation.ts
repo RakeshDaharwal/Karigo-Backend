@@ -18,13 +18,21 @@ export const updateBusinessCategorySchema = z.object({
     .refine((value) => value.length >= 2, "Business category name is required"),
 });
 
+const idSchema = z.string().refine(
+  (v) =>
+    /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(v) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
+  "Business category id must be a valid id"
+);
+
 export const businessCategoryIdSchema = z.object({
-  id: z.string().refine(
-    (v) =>
-      /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(v) ||
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
-    "Business category id must be a valid id"
-  ),
+  id: idSchema,
+});
+
+export const reorderBusinessCategoriesSchema = z.object({
+  orderedIds: z
+    .array(idSchema)
+    .min(1, "At least one business category id is required"),
 });
 
 export type CreateBusinessCategoryInput = z.infer<
@@ -32,4 +40,7 @@ export type CreateBusinessCategoryInput = z.infer<
 >;
 export type UpdateBusinessCategoryInput = z.infer<
   typeof updateBusinessCategorySchema
+>;
+export type ReorderBusinessCategoriesInput = z.infer<
+  typeof reorderBusinessCategoriesSchema
 >;
