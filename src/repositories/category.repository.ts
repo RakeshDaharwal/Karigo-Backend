@@ -95,12 +95,18 @@ export const softDeleteCategoryById = (id: string) => {
 };
 
 export const reorderCategories = (orderedIds: string[]) => {
-  return prisma.$transaction(
-    orderedIds.map((id, index) =>
+  return prisma.$transaction([
+    ...orderedIds.map((id, index) =>
+      prisma.workerCategory.update({
+        where: { id },
+        data: { sortOrder: -(index + 1) },
+      })
+    ),
+    ...orderedIds.map((id, index) =>
       prisma.workerCategory.update({
         where: { id },
         data: { sortOrder: index },
       })
-    )
-  );
+    ),
+  ]);
 };

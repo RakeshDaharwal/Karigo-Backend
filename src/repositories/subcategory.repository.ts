@@ -103,12 +103,18 @@ export const findSubCategoriesByCategoryId = (categoryId: string) => {
 };
 
 export const reorderSubCategories = (orderedIds: string[]) => {
-  return prisma.$transaction(
-    orderedIds.map((id, index) =>
+  return prisma.$transaction([
+    ...orderedIds.map((id, index) =>
+      prisma.workerSubCategory.update({
+        where: { id },
+        data: { sortOrder: -(index + 1) },
+      })
+    ),
+    ...orderedIds.map((id, index) =>
       prisma.workerSubCategory.update({
         where: { id },
         data: { sortOrder: index },
       })
-    )
-  );
+    ),
+  ]);
 };
