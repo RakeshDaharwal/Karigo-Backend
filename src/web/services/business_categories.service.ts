@@ -6,15 +6,20 @@ import {
   findBusinessCategoryByName,
   findBusinessCategoryByNameExcludingId,
   getActiveBusinessCategories,
+  reorderBusinessCategories,
   softDeleteBusinessCategoryById,
   updateBusinessCategoryById,
 } from "../../repositories/business_category.repository";
+import { uploadBusinessCategoryIcon } from "../../utils/cloudinary.utils";
 
 export const getBusinessCategoriesService = async () => {
   return getActiveBusinessCategories();
 };
 
-export const createBusinessCategoryService = async (name: string) => {
+export const createBusinessCategoryService = async (
+  name: string,
+  iconFile: Express.Multer.File
+) => {
   const existing = await findBusinessCategoryByName(name);
 
   if (existing) {
@@ -25,8 +30,11 @@ export const createBusinessCategoryService = async (name: string) => {
     throw error;
   }
 
+  const categoryId = ulid();
+
   try {
-    return await createBusinessCategory(ulid(), name);
+    const uploaded = await uploadBusinessCategoryIcon(categoryId, iconFile);
+    return await createBusinessCategory(categoryId, name, uploaded.url);
   } catch (error: any) {
     if (error?.code === "P2002") {
       const customError = new Error("Business category already exists") as Error & {
@@ -39,7 +47,11 @@ export const createBusinessCategoryService = async (name: string) => {
   }
 };
 
-export const updateBusinessCategoryService = async (id: string, name: string) => {
+export const updateBusinessCategoryService = async (
+  id: string,
+  name: string,
+  iconFile?: Express.Multer.File
+) => {
   const existing = await findBusinessCategoryById(id);
 
   if (!existing) {
@@ -61,7 +73,13 @@ export const updateBusinessCategoryService = async (id: string, name: string) =>
   }
 
   try {
-    return await updateBusinessCategoryById(id, name);
+    let iconUrl: string | undefined;
+    if (iconFile) {
+      const uploaded = await uploadBusinessCategoryIcon(id, iconFile);
+      iconUrl = uploaded.url;
+    }
+
+    return await updateBusinessCategoryById(id, name, iconUrl);
   } catch (error: any) {
     if (error?.code === "P2002") {
       const customError = new Error("Business category already exists") as Error & {
@@ -85,8 +103,6 @@ export const deleteBusinessCategoryService = async (id: string) => {
     throw error;
   }
 
-  // Prevent removing a category that is still referenced by businesses, otherwise
-  // the FK would block the soft-delete from being meaningful for filters/lists.
   const inUse = await countBusinessesByCategoryId(id);
   if (inUse > 0) {
     const error = new Error(
@@ -97,4 +113,39 @@ export const deleteBusinessCategoryService = async (id: string) => {
   }
 
   return softDeleteBusinessCategoryById(id);
+};
+
+export const reorderBusinessCategoriesService = async (orderedIds: string[]) => {
+  const uniqueIds = new Set(orderedIds);
+  if (uniqueIds.size !== orderedIds.length) {
+    const error = new Error("Duplicate business category ids are not allowed") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const categories = await getActiveBusinessCategories();
+  const activeIds = new Set(categories.map((c) => c.id));
+
+  if (orderedIds.length !== categories.length) {
+    const error = new Error(
+      "Ordered ids must include every active business category exactly once"
+    ) as Error & { statusCode: number };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  for (const id of orderedIds) {
+    if (!activeIds.has(id)) {
+      const error = new Error("One or more business category ids are invalid") as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  await reorderBusinessCategories(orderedIds);
+  return getActiveBusinessCategories();
 };

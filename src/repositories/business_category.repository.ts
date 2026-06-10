@@ -12,11 +12,26 @@ export const findBusinessCategoryByName = (name: string) => {
   });
 };
 
-export const createBusinessCategory = (id: string, name: string) => {
+const nextBusinessCategorySortOrder = async () => {
+  const { _max } = await prisma.businessCategory.aggregate({
+    where: { deletedAt: null },
+    _max: { sortOrder: true },
+  });
+  return (_max.sortOrder ?? -1) + 1;
+};
+
+export const createBusinessCategory = async (
+  id: string,
+  name: string,
+  iconUrl: string
+) => {
+  const sortOrder = await nextBusinessCategorySortOrder();
   return prisma.businessCategory.create({
     data: {
       id,
       name,
+      iconUrl,
+      sortOrder,
     },
   });
 };
@@ -48,13 +63,18 @@ export const findBusinessCategoryByNameExcludingId = (
   });
 };
 
-export const updateBusinessCategoryById = (id: string, name: string) => {
+export const updateBusinessCategoryById = (
+  id: string,
+  name: string,
+  iconUrl?: string
+) => {
   return prisma.businessCategory.update({
     where: {
       id,
     },
     data: {
       name,
+      ...(iconUrl !== undefined ? { iconUrl } : {}),
     },
   });
 };
@@ -65,7 +85,7 @@ export const getActiveBusinessCategories = () => {
       deletedAt: null,
     },
     orderBy: {
-      createdAt: "desc",
+      sortOrder: "asc",
     },
   });
 };
@@ -79,6 +99,23 @@ export const softDeleteBusinessCategoryById = (id: string) => {
       deletedAt: new Date(),
     },
   });
+};
+
+export const reorderBusinessCategories = (orderedIds: string[]) => {
+  return prisma.$transaction([
+    ...orderedIds.map((id, index) =>
+      prisma.businessCategory.update({
+        where: { id },
+        data: { sortOrder: -(index + 1) },
+      })
+    ),
+    ...orderedIds.map((id, index) =>
+      prisma.businessCategory.update({
+        where: { id },
+        data: { sortOrder: index },
+      })
+    ),
+  ]);
 };
 
 export const countBusinessesByCategoryId = (categoryId: string) => {

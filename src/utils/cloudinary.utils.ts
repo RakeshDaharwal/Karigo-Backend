@@ -123,6 +123,17 @@ export const uploadWorkerCategoryIcon = async (
   );
 };
 
+export const uploadBusinessCategoryIcon = async (
+  categoryId: string,
+  file: Express.Multer.File,
+): Promise<CloudinaryUploadResult> => {
+  return uploadImageBuffer(
+    file.buffer,
+    "business-categories/icons",
+    `category_${categoryId}`,
+  );
+};
+
 export const uploadWorkerSubCategoryIcon = async (
   categoryId: string,
   subCategoryId: string,

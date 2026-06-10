@@ -4,11 +4,13 @@ import {
   createBusinessCategoryService,
   deleteBusinessCategoryService,
   getBusinessCategoriesService,
+  reorderBusinessCategoriesService,
   updateBusinessCategoryService,
 } from "../services/business_categories.service";
 import {
   businessCategoryIdSchema,
   CreateBusinessCategoryInput,
+  ReorderBusinessCategoriesInput,
   UpdateBusinessCategoryInput,
 } from "../validation/business_categories.validation";
 
@@ -50,7 +52,7 @@ export const createBusinessCategory = async (
 ) => {
   try {
     const { name } = req.body;
-    const data = await createBusinessCategoryService(name);
+    const data = await createBusinessCategoryService(name, req.file!);
 
     logInfo("Business category created", {
       service: "business_categories",
@@ -94,7 +96,7 @@ export const updateBusinessCategory = async (
 
     const id = parsedId.data.id;
     const { name } = req.body;
-    const data = await updateBusinessCategoryService(id, name);
+    const data = await updateBusinessCategoryService(id, name, req.file);
 
     logInfo("Business category updated", {
       service: "business_categories",
@@ -116,6 +118,39 @@ export const updateBusinessCategory = async (
       event: "UPDATE_BUSINESS_CATEGORY_FAILED",
       id: req.params?.id,
       name: req.body?.name,
+      path: req.path,
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+export const reorderBusinessCategories = async (
+  req: Request<{}, {}, ReorderBusinessCategoriesInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { orderedIds } = req.body;
+    const data = await reorderBusinessCategoriesService(orderedIds);
+
+    logInfo("Business categories reordered successfully", {
+      service: "business_categories",
+      event: "REORDER_BUSINESS_CATEGORIES_SUCCESS",
+      count: orderedIds.length,
+      path: req.path,
+    });
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Business categories reordered successfully",
+      data,
+    });
+  } catch (error: any) {
+    logError("Business category reorder failed", {
+      service: "business_categories",
+      event: "REORDER_BUSINESS_CATEGORIES_FAILED",
       path: req.path,
       error: error.message,
     });
