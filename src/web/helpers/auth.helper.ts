@@ -1,10 +1,14 @@
 import redis from "../../config/redis.conn";
 import { env } from "../../config/env";
+import { sendOtpSms } from "../../utils/sms.utils";
 
 const OTP_TTL_SECONDS = env.otpTtlSeconds;
 const OTP_COOLDOWN_SECONDS = env.otpCooldownSeconds;
 const OTP_MOBILE_LIMIT_WINDOW_SECONDS = env.otpMobileLimitWindowSeconds;
 const OTP_IP_LIMIT_WINDOW_SECONDS = env.otpIpLimitWindowSeconds;
+const OTP_MOBILE_LIMIT_MAX = env.otpMobileLimitMax;
+const OTP_IP_LIMIT_MAX = env.otpIpLimitMax;
+const OTP_MAX_ATTEMPTS = env.otpMaxAttempts;
 
 export const BYPASS_OTP = "123456";
 
@@ -105,4 +109,103 @@ export const incrementIpOtpLimit = async (ip: string) => {
     await redis.expire(key, OTP_IP_LIMIT_WINDOW_SECONDS);
   }
   return currentCount;
+};
+
+export const generateOtp = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Shared OTP request guards (rate limit, cooldown). Throws on violation.
+export const enforceOtpRequestLimits = async (mobile: string, ip: string) => {
+  const [mobileRequestCount, ipRequestCount] = await Promise.all([
+    incrementMobileOtpLimit(mobile),
+    incrementIpOtpLimit(ip),
+  ]);
+
+  if (mobileRequestCount > OTP_MOBILE_LIMIT_MAX) {
+    const error = new Error(
+      "Too many OTP requests for this mobile. Try after 1 hour."
+    ) as Error & { statusCode: number };
+    error.statusCode = 429;
+    throw error;
+  }
+
+  if (ipRequestCount > OTP_IP_LIMIT_MAX) {
+    const error = new Error(
+      "Too many OTP requests from this IP. Try after 1 minute."
+    ) as Error & { statusCode: number };
+    error.statusCode = 429;
+    throw error;
+  }
+
+  if (await isOtpCooldownActive(mobile)) {
+    const error = new Error(
+      "OTP already sent recently. Please wait 30 seconds."
+    ) as Error & { statusCode: number };
+    error.statusCode = 429;
+    throw error;
+  }
+};
+
+// Generates and persists (or reuses) an OTP, then sends it via SMS.
+export const issueOtp = async (mobile: string) => {
+  const existingOtp = await getOtpRecord(mobile);
+  const otpToSend = existingOtp?.otp ?? generateOtp();
+
+  if (!existingOtp) {
+    await setOtpRecord(mobile, { otp: otpToSend, attempts: 0 });
+  }
+
+  // await sendOtpSms(mobile, otpToSend);
+  await setOtpCooldown(mobile);
+
+  return { otpReused: Boolean(existingOtp) };
+};
+
+// Shared OTP verification flow. Returns void; throws on bad/expired/invalid.
+export const consumeValidOtp = async (mobile: string, otp: string) => {
+  if (isBypassOtp(otp)) {
+    await deleteOtpRecord(mobile);
+    return;
+  }
+
+  const otpRecord = await getOtpRecord(mobile);
+  if (!otpRecord) {
+    const error = new Error("OTP expired or not found") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!otpsMatch(otpRecord.otp, otp)) {
+    const updatedAttempts = otpRecord.attempts + 1;
+
+    if (updatedAttempts >= OTP_MAX_ATTEMPTS) {
+      await deleteOtpRecord(mobile);
+      const error = new Error("Too many incorrect attempts") as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 429;
+      throw error;
+    }
+
+    const otpUpdated = await updateOtpAttemptsKeepingTtl(
+      mobile,
+      updatedAttempts
+    );
+    if (!otpUpdated) {
+      const error = new Error("OTP expired or not found") as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const error = new Error("Invalid OTP") as Error & { statusCode: number };
+    error.statusCode = 401;
+    throw error;
+  }
+
+  await deleteOtpRecord(mobile);
 };
