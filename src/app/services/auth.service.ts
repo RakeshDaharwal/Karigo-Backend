@@ -20,10 +20,6 @@ const generateOtp = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-export const sendSMS = async (mobile: string, otp: string) => {
-  await sendOtpSms(mobile, otp);
-};
-
 export const userLoginService = async (mobile: string, _ip: string) => {
   const cooldownActive = await isOtpCooldownActive(mobile);
 
@@ -42,7 +38,7 @@ export const userLoginService = async (mobile: string, _ip: string) => {
     await setOtpRecord(mobile, { otp: otpToSend, attempts: 0 });
   }
 
-  // await sendSMS(mobile, otpToSend);
+  // await sendOtpSms(mobile, otpToSend);
   await setOtpCooldown(mobile);
 
   return {
