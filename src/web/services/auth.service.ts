@@ -1,7 +1,5 @@
 import prisma from "../../config/db.conn";
 import { generateAppAccessToken } from "../../utils/jwt.utils";
-import { sendOtpSms } from "../../utils/sms.utils";
-import { env } from "../../config/env";
 import { Role } from "../../generated/prisma/enums";
 import { findUserByMobile } from "../../repositories/user.repository";
 import {
@@ -9,125 +7,10 @@ import {
   findApprovedBusinessesByUserId,
 } from "../../repositories/business.repository";
 import {
-  deleteOtpRecord,
-  getOtpRecord,
-  incrementIpOtpLimit,
-  incrementMobileOtpLimit,
-  isBypassOtp,
-  isOtpCooldownActive,
-  otpsMatch,
-  setOtpCooldown,
-  setOtpRecord,
-  updateOtpAttemptsKeepingTtl,
+  consumeValidOtp,
+  enforceOtpRequestLimits,
+  issueOtp,
 } from "../helpers/auth.helper";
-
-const OTP_MOBILE_LIMIT_MAX = env.otpMobileLimitMax;
-const OTP_IP_LIMIT_MAX = env.otpIpLimitMax;
-const OTP_MAX_ATTEMPTS = env.otpMaxAttempts;
-
-// Shared OTP request guards (rate limit, cooldown). Throws on violation.
-const enforceOtpRequestLimits = async (mobile: string, ip: string) => {
-  const [mobileRequestCount, ipRequestCount] = await Promise.all([
-    incrementMobileOtpLimit(mobile),
-    incrementIpOtpLimit(ip),
-  ]);
-
-  if (mobileRequestCount > OTP_MOBILE_LIMIT_MAX) {
-    const error = new Error(
-      "Too many OTP requests for this mobile. Try after 1 hour."
-    ) as Error & { statusCode: number };
-    error.statusCode = 429;
-    throw error;
-  }
-
-  if (ipRequestCount > OTP_IP_LIMIT_MAX) {
-    const error = new Error(
-      "Too many OTP requests from this IP. Try after 1 minute."
-    ) as Error & { statusCode: number };
-    error.statusCode = 429;
-    throw error;
-  }
-
-  if (await isOtpCooldownActive(mobile)) {
-    const error = new Error(
-      "OTP already sent recently. Please wait 30 seconds."
-    ) as Error & { statusCode: number };
-    error.statusCode = 429;
-    throw error;
-  }
-};
-
-// Shared OTP verification flow. Returns void; throws on bad/expired/invalid.
-const consumeValidOtp = async (mobile: string, otp: string) => {
-  if (isBypassOtp(otp)) {
-    await deleteOtpRecord(mobile);
-    return;
-  }
-
-  const otpRecord = await getOtpRecord(mobile);
-  if (!otpRecord) {
-    const error = new Error("OTP expired or not found") as Error & {
-      statusCode: number;
-    };
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!otpsMatch(otpRecord.otp, otp)) {
-    const updatedAttempts = otpRecord.attempts + 1;
-
-    if (updatedAttempts >= OTP_MAX_ATTEMPTS) {
-      await deleteOtpRecord(mobile);
-      const error = new Error("Too many incorrect attempts") as Error & {
-        statusCode: number;
-      };
-      error.statusCode = 429;
-      throw error;
-    }
-
-    const otpUpdated = await updateOtpAttemptsKeepingTtl(
-      mobile,
-      updatedAttempts
-    );
-    if (!otpUpdated) {
-      const error = new Error("OTP expired or not found") as Error & {
-        statusCode: number;
-      };
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const error = new Error("Invalid OTP") as Error & { statusCode: number };
-    error.statusCode = 401;
-    throw error;
-  }
-
-  await deleteOtpRecord(mobile);
-};
-
-const generateOtp = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-export const sendSMS = async (mobile: string, otp: string) => {
-  await sendOtpSms(mobile, otp);
-};
-
-// Generates and persists (or reuses) an OTP, then "sends" it via SMS.
-// Returns whether a fresh OTP was created or the in-flight one was reused.
-const issueOtp = async (mobile: string) => {
-  const existingOtp = await getOtpRecord(mobile);
-  const otpToSend = existingOtp?.otp ?? generateOtp();
-
-  if (!existingOtp) {
-    await setOtpRecord(mobile, { otp: otpToSend, attempts: 0 });
-  }
-
-  await sendSMS(mobile, otpToSend);
-  await setOtpCooldown(mobile);
-
-  return { otpReused: Boolean(existingOtp) };
-};
 
 export const superAdminLoginService = async (mobile: string, ip: string) => {
   const superAdminUser = await findUserByMobile(mobile);
