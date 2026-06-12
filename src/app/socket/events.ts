@@ -13,6 +13,14 @@ export const SOCKET_EVENTS = {
   // server -> client
   MESSAGE_NEW: "message:new",
   MESSAGE_STATUS: "message:status",
+  MESSAGE_DELETED: "message:deleted",
+  MESSAGE_EDITED: "message:edited",
+  CHAT_CLEARED: "chat:cleared",
+  CHAT_BLOCK_UPDATE: "chat:block:update",
+  // Authoritative "you have read this room" pushed to the reader's own devices
+  // so their conversation list clears the unread badge even when the HTTP
+  // rooms fetch raced ahead of the seen write (or the room wasn't cached).
+  CHAT_ROOM_READ: "chat:room:read",
   TYPING: "typing",
   PRESENCE_UPDATE: "presence:update",
 } as const;
@@ -20,7 +28,13 @@ export const SOCKET_EVENTS = {
 // ---- Payload contracts ----
 export type ChatJoinPayload = { workerId: string };
 export type ChatJoinResult =
-  | { ok: true; roomId: string; peerUserId: string; peerOnline: boolean }
+  | {
+      ok: true;
+      roomId: string;
+      peerUserId: string;
+      peerOnline: boolean;
+      blockedBy: string | null;
+    }
   | { ok: false; error: string };
 
 export type ChatLeavePayload = { roomId: string };
@@ -60,3 +74,13 @@ export type TypingPayload = { roomId: string };
 export type TypingEvent = { roomId: string; userId: string; typing: boolean };
 
 export type PresenceUpdateEvent = { roomId: string; userId: string; online: boolean };
+
+export type MessageDeletedEvent = { roomId: string; messageId: string };
+export type MessageEditedEvent = {
+  roomId: string;
+  messageId: string;
+  content: string;
+};
+export type ChatClearedEvent = { roomId: string };
+export type ChatBlockUpdateEvent = { roomId: string; blockedBy: string | null };
+export type ChatRoomReadEvent = { roomId: string; readerUserId: string };

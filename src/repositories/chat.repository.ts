@@ -1,6 +1,11 @@
 import prisma from "../config/db.conn";
 import { ulid } from "ulid";
 import { MessageStatus } from "../generated/prisma/enums";
+import {
+  isClearedAfter,
+  isMessageDeleted,
+  isRoomSeenAfter,
+} from "../app/socket/chatRuntimeState";
 
 export type RoomLite = {
   id: string;
@@ -22,26 +27,38 @@ export const ensureRoom = async (userId: string, workerId: string) => {
     where: { userId_workerId: { userId, workerId } },
     create: { id: ulid(), userId, workerId },
     update: {},
-    select: { id: true, userId: true, worker: { select: { userId: true } } },
+    select: {
+      id: true,
+      userId: true,
+      blockedBy: true,
+      worker: { select: { userId: true } },
+    },
   });
   return {
     id: room.id,
     userId: room.userId,
     workerUserId: room.worker.userId,
-  } satisfies RoomLite;
+    blockedBy: room.blockedBy,
+  };
 };
 
 export const getRoomParticipants = async (roomId: string) => {
   const room = await prisma.chatRoom.findUnique({
     where: { id: roomId },
-    select: { id: true, userId: true, worker: { select: { userId: true } } },
+    select: {
+      id: true,
+      userId: true,
+      blockedBy: true,
+      worker: { select: { userId: true } },
+    },
   });
   if (!room) return null;
   return {
     id: room.id,
     userId: room.userId,
     workerUserId: room.worker.userId,
-  } satisfies RoomLite;
+    blockedBy: room.blockedBy,
+  };
 };
 
 type PersistMessageInput = {
@@ -57,11 +74,24 @@ type PersistMessageInput = {
 // + receiver unread increment, in a single transaction.
 export const persistMessage = (input: PersistMessageInput) =>
   prisma.$transaction(async (tx) => {
+    // Guard against the delete/clear-then-late-save race: a message that was
+    // hard-deleted (or whose room was cleared) before its save job ran must not
+    // be resurrected.
+    if (isMessageDeleted(input.id) || isClearedAfter(input.roomId, input.createdAt)) {
+      return;
+    }
+
     const existing = await tx.chatMessage.findUnique({
       where: { id: input.id },
       select: { id: true },
     });
     if (existing) return;
+
+    // The receiver may have already read this message (chat open) before its
+    // save job ran. Settle it as SEEN and skip the unread bump so the persisted
+    // state matches what both clients already show, even if the reader has
+    // since left the room and presence no longer reports them in it.
+    const alreadySeen = isRoomSeenAfter(input.roomId, input.receiverId, input.createdAt);
 
     await tx.chatMessage.create({
       data: {
@@ -70,7 +100,8 @@ export const persistMessage = (input: PersistMessageInput) =>
         senderId: input.senderId,
         receiverId: input.receiverId,
         content: input.content,
-        status: MessageStatus.SENT,
+        status: alreadySeen ? MessageStatus.SEEN : MessageStatus.SENT,
+        seenAt: alreadySeen ? new Date() : null,
         createdAt: input.createdAt,
       },
     });
@@ -82,6 +113,11 @@ export const persistMessage = (input: PersistMessageInput) =>
     if (!room) return;
 
     const receiverIsCustomer = input.receiverId === room.userId;
+    const unreadBump = alreadySeen
+      ? {}
+      : receiverIsCustomer
+        ? { userUnreadCount: { increment: 1 } }
+        : { workerUnreadCount: { increment: 1 } };
 
     await tx.chatRoom.update({
       where: { id: input.roomId },
@@ -90,9 +126,7 @@ export const persistMessage = (input: PersistMessageInput) =>
         lastMessageContent: input.content,
         lastMessageSenderId: input.senderId,
         lastMessageAt: input.createdAt,
-        ...(receiverIsCustomer
-          ? { userUnreadCount: { increment: 1 } }
-          : { workerUnreadCount: { increment: 1 } }),
+        ...unreadBump,
       },
     });
   });
@@ -121,7 +155,9 @@ export const markRoomSeen = async (roomId: string, receiverId: string) => {
       where: {
         roomId,
         receiverId,
-        status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] },
+        status: {
+          in: [MessageStatus.PENDING, MessageStatus.SENT, MessageStatus.DELIVERED],
+        },
       },
       data: { status: MessageStatus.SEEN, seenAt: new Date() },
     }),
@@ -134,6 +170,120 @@ export const markRoomSeen = async (roomId: string, receiverId: string) => {
   ]);
 
   return { peerUserId };
+};
+
+// ---- Mutations: edit / delete / clear / block ----
+
+// Hard-deletes a single message and, when it was the room's newest message,
+// recomputes the denormalized room preview from the remaining messages.
+// Returns both participant user ids for realtime fan-out, or null when the
+// room can't be resolved.
+export const deleteMessageById = async (roomId: string, messageId: string) => {
+  const room = await prisma.chatRoom.findUnique({
+    where: { id: roomId },
+    select: { userId: true, worker: { select: { userId: true } } },
+  });
+  if (!room) return null;
+
+  await prisma.$transaction(async (tx) => {
+    const deleted = await tx.chatMessage.deleteMany({
+      where: { id: messageId, roomId },
+    });
+    if (deleted.count === 0) return;
+
+    const latest = await tx.chatMessage.findFirst({
+      where: { roomId },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { id: true, content: true, senderId: true, createdAt: true },
+    });
+
+    await tx.chatRoom.update({
+      where: { id: roomId },
+      data: {
+        lastMessageId: latest?.id ?? null,
+        lastMessageContent: latest?.content ?? null,
+        lastMessageSenderId: latest?.senderId ?? null,
+        lastMessageAt: latest?.createdAt ?? null,
+      },
+    });
+  });
+
+  return { userId: room.userId, workerUserId: room.worker.userId };
+};
+
+// Edits a message's content. Only the original sender may edit. Keeps the room
+// preview in sync when the edited message is the room's last message.
+export const editMessageById = async (
+  roomId: string,
+  messageId: string,
+  senderId: string,
+  content: string
+) => {
+  const message = await prisma.chatMessage.findFirst({
+    where: { id: messageId, roomId },
+    select: { senderId: true },
+  });
+  if (!message) return { ok: false as const, error: "not_found" };
+  if (message.senderId !== senderId) {
+    return { ok: false as const, error: "forbidden" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.chatMessage.update({
+      where: { id: messageId },
+      data: { content },
+    });
+    await tx.chatRoom.updateMany({
+      where: { id: roomId, lastMessageId: messageId },
+      data: { lastMessageContent: content },
+    });
+  });
+
+  return { ok: true as const };
+};
+
+// Hard-deletes every message in a room and resets its preview + unread counters.
+export const clearRoomMessages = async (roomId: string) =>
+  prisma.$transaction([
+    prisma.chatMessage.deleteMany({ where: { roomId } }),
+    prisma.chatRoom.update({
+      where: { id: roomId },
+      data: {
+        lastMessageId: null,
+        lastMessageContent: null,
+        lastMessageSenderId: null,
+        lastMessageAt: null,
+        userUnreadCount: 0,
+        workerUnreadCount: 0,
+      },
+    }),
+  ]);
+
+// Sets (or clears, with null) the block owner on a room.
+export const setRoomBlockedBy = (roomId: string, blockedBy: string | null) =>
+  prisma.chatRoom.update({
+    where: { id: roomId },
+    data: { blockedBy },
+    select: { id: true, blockedBy: true },
+  });
+
+export const getRoomMeta = async (roomId: string) => {
+  const room = await prisma.chatRoom.findUnique({
+    where: { id: roomId },
+    select: {
+      id: true,
+      userId: true,
+      blockedBy: true,
+      worker: { select: { userId: true } },
+    },
+  });
+  if (!room) return null;
+  return {
+    id: room.id,
+    userId: room.userId,
+    workerUserId: room.worker.userId,
+    blockedBy: room.blockedBy,
+  };
 };
 
 // ---- Read paths (used by REST + React Query) ----
@@ -161,6 +311,7 @@ export const listRoomsForViewer = async (viewerUserId: string) => {
       lastMessageSenderId: true,
       userUnreadCount: true,
       workerUnreadCount: true,
+      blockedBy: true,
       updatedAt: true,
       user: {
         select: { firstName: true, lastName: true, mobile: true, profileImage: true },

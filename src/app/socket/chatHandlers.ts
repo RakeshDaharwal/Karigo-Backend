@@ -2,17 +2,19 @@ import { type Server, type Socket } from "socket.io";
 import { ulid } from "ulid";
 
 import { MessageStatus } from "../../generated/prisma/enums";
+import { applyRoomSeen } from "../chat/applyRoomSeen";
 import {
   ensureRoom,
   getRoomParticipants,
 } from "../../repositories/chat.repository";
-import { enqueueMessageSave, enqueueRoomSeen } from "../../queues";
+import { enqueueMessageSave } from "../../queues";
 import {
   addSocket,
   removeSocket,
   isOnline,
 } from "./presence";
-import { userRoom, chatRoom } from "./io";
+import { isRoomBlocked, setRoomBlock } from "./chatRuntimeState";
+import { userRoom, chatRoom, isUserInRoom } from "./io";
 import {
   SOCKET_EVENTS,
   type ChatJoinPayload,
@@ -60,7 +62,9 @@ export const registerChatHandlers = (socket: Socket, io: Server) => {
     SOCKET_EVENTS.CHAT_JOIN,
     async (payload: ChatJoinPayload & { roomId?: string }, cb: unknown) => {
       try {
-        let room: { id: string; userId: string; workerUserId: string } | null = null;
+        let room:
+          | { id: string; userId: string; workerUserId: string; blockedBy: string | null }
+          | null = null;
 
         if (payload?.roomId) {
           room = await getRoomParticipants(payload.roomId);
@@ -78,10 +82,21 @@ export const registerChatHandlers = (socket: Socket, io: Server) => {
           return;
         }
 
+        // Seed the in-memory block cache so the hot message-send path stays
+        // DB-free.
+        setRoomBlock(room.id, room.blockedBy);
+
         socket.join(chatRoom(room.id));
         const peerUserId = userId === room.userId ? room.workerUserId : room.userId;
+
+        // Presence is room-scoped: "online" means the peer currently has THIS
+        // chat open (joined the room), not merely that their app is connected.
+        // Global presence can't be used here because the disconnect broadcast
+        // only reaches rooms the leaving socket had joined, so a globally-online
+        // peer who never opened this chat would get stuck showing "online".
+        const peerOnline = await isUserInRoom(room.id, peerUserId);
         console.log(
-          `[socket] chat:join userId=${userId} roomId=${room.id} peerUserId=${peerUserId} peerOnline=${isOnline(peerUserId)}`
+          `[socket] chat:join userId=${userId} roomId=${room.id} peerUserId=${peerUserId} peerOnline=${peerOnline}`
         );
 
         // Tell the peer (if joined) that we are now online in this room.
@@ -95,7 +110,8 @@ export const registerChatHandlers = (socket: Socket, io: Server) => {
           ok: true,
           roomId: room.id,
           peerUserId,
-          peerOnline: isOnline(peerUserId),
+          peerOnline,
+          blockedBy: room.blockedBy,
         });
       } catch (err) {
         logError("chat:join failed", { userId, error: (err as Error)?.message });
@@ -136,6 +152,11 @@ export const registerChatHandlers = (socket: Socket, io: Server) => {
         // Only members joined to the room may send into it.
         if (!socket.rooms.has(chatRoom(roomId))) {
           callAck<MessageSendAck>(cb, { ok: false, tempId, error: "not_joined" });
+          return;
+        }
+        // Blocked rooms reject sends from either side (cache seeded on join).
+        if (isRoomBlocked(roomId)) {
+          callAck<MessageSendAck>(cb, { ok: false, tempId, error: "blocked" });
           return;
         }
 
@@ -185,11 +206,17 @@ export const registerChatHandlers = (socket: Socket, io: Server) => {
     }
   );
 
-  socket.on(SOCKET_EVENTS.MESSAGE_SEEN, (payload: MessageSeenPayload) => {
+  socket.on(SOCKET_EVENTS.MESSAGE_SEEN, async (payload: MessageSeenPayload) => {
     if (!payload?.roomId) return;
-    void enqueueRoomSeen(payload.roomId, userId).catch((err) =>
-      logError("enqueue room-seen failed", { userId, error: err?.message })
-    );
+    const roomId = payload.roomId;
+    try {
+      const result = await applyRoomSeen(roomId, userId);
+      console.log(
+        `[socket] message:seen roomId=${roomId} readerUserId=${userId} cleared=${Boolean(result)}`
+      );
+    } catch (err) {
+      logError("message:seen failed", { userId, roomId, error: (err as Error)?.message });
+    }
   });
 
   // --- typing: pure forward, never persisted ---

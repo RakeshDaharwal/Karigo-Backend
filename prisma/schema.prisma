@@ -297,6 +297,10 @@ model ChatRoom {
   userUnreadCount   Int @default(0)
   workerUnreadCount Int @default(0)
 
+  // Userid of the participant who blocked the conversation. Null = not blocked.
+  // While set, neither side may send into the room.
+  blockedBy String?
+
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   worker   Worker        @relation(fields: [workerId], references: [id], onDelete: Cascade)
   messages ChatMessage[]

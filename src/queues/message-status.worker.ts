@@ -1,10 +1,8 @@
 import { Worker } from "bullmq";
 
 import { bullConnection, QUEUE_NAMES } from "../config/bullmq.conn";
-import {
-  markMessageDelivered,
-  markRoomSeen,
-} from "../repositories/chat.repository";
+import { applyRoomSeen } from "../app/chat/applyRoomSeen";
+import { markMessageDelivered } from "../repositories/chat.repository";
 import { MessageStatus } from "../generated/prisma/enums";
 import { getIO, userRoom } from "../app/socket/io";
 import { SOCKET_EVENTS, type MessageStatusEvent } from "../app/socket/events";
@@ -34,18 +32,7 @@ export const createMessageStatusWorker = () => {
         return;
       }
 
-      // seen: mark all unseen messages addressed to receiver as SEEN.
-      const result = await markRoomSeen(data.roomId, data.receiverId);
-      if (result) {
-        // Notify the peer (message senders) only. The reader must not receive
-        // this event or their own outgoing ticks inflate to SEEN in the UI.
-        emitToUser(result.peerUserId, {
-          roomId: data.roomId,
-          status: MessageStatus.SEEN,
-          upToCreatedAt: new Date().toISOString(),
-          readByUserId: data.receiverId,
-        });
-      }
+      await applyRoomSeen(data.roomId, data.receiverId);
     },
     { connection: bullConnection, concurrency: 10 }
   );
