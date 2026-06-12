@@ -1,5 +1,62 @@
 import { Request, Response, NextFunction } from "express";
-import prisma from "../../config/db.conn";
+
+import { applyRoomSeen } from "../chat/applyRoomSeen";
+import {
+  listRoomsForViewer,
+  getRoomParticipants,
+  getMessagesPage,
+  parseCursor,
+  deleteMessageById,
+  editMessageById,
+  clearRoomMessages,
+  setRoomBlockedBy,
+} from "../../repositories/chat.repository";
+import { getIO, userRoom, chatRoom } from "../socket/io";
+import {
+  markMessageDeleted,
+  markRoomCleared,
+  setRoomBlock,
+} from "../socket/chatRuntimeState";
+import {
+  SOCKET_EVENTS,
+  type MessageDeletedEvent,
+  type MessageEditedEvent,
+  type ChatClearedEvent,
+  type ChatBlockUpdateEvent,
+} from "../socket/events";
+
+const MAX_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 30;
+const MAX_MESSAGE_LENGTH = 4000;
+
+const getViewer = (req: Request) =>
+  (req as Request & { user?: { userId: string } }).user;
+
+const getRoomId = (req: Request) => {
+  const raw = req.params.roomId;
+  return typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : "";
+};
+
+const getMessageId = (req: Request) => {
+  const raw = req.params.messageId;
+  return typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : "";
+};
+
+// Fan a realtime chat event out to every joined socket in the room plus both
+// participants' personal rooms (so devices that aren't currently viewing the
+// thread still update their conversation list).
+const broadcastToRoom = <T>(
+  roomId: string,
+  participants: { userId: string; workerUserId: string },
+  event: string,
+  payload: T
+) => {
+  getIO()
+    .to(chatRoom(roomId))
+    .to(userRoom(participants.userId))
+    .to(userRoom(participants.workerUserId))
+    .emit(event, payload);
+};
 
 export const getChatRooms = async (
   req: Request,
@@ -7,73 +64,46 @@ export const getChatRooms = async (
   next: NextFunction
 ) => {
   try {
-    const user = (req as Request & { user?: { userId: string } }).user;
+    const user = getViewer(req);
     if (!user?.userId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const userId = user.userId;
+    const rooms = await listRoomsForViewer(user.userId);
 
-    const worker = await prisma.worker.findFirst({ where: { userId } });
-
-    const rooms = await prisma.chatRoom.findMany({
-      where: worker
-        ? {
-            OR: [{ userId }, { workerId: worker.id }],
-          }
-        : { userId },
-      include: {
-        user: true,
-        worker: {
-          include: { user: true }
-        },
-        messages: {
-          orderBy: { createdAt: "desc" },
-          take: 1
-        }
-      }
-    });
-
-    const visibleRooms = rooms.filter(
-      (room) => room.userId !== room.worker.userId && room.messages.length > 0
-    );
-
-    const formattedRooms = visibleRooms.map((room) => {
-      const isUserSide = room.userId === userId;
+    const data = rooms.map((room) => {
+      const isUserSide = room.userId === user.userId;
 
       const otherPersonName = isUserSide
-        ? `${room.worker.user.firstName || ''} ${room.worker.user.lastName || ''}`.trim() || room.worker.mobile
-        : `${room.user.firstName || ''} ${room.user.lastName || ''}`.trim() || room.user.mobile;
+        ? `${room.worker.user.firstName || ""} ${room.worker.user.lastName || ""}`.trim() ||
+          room.worker.mobile
+        : `${room.user.firstName || ""} ${room.user.lastName || ""}`.trim() ||
+          room.user.mobile;
 
-      const avatar = otherPersonName.substring(0, 2).toUpperCase() || 'U';
-
-      const lastMsg = room.messages.length > 0 ? room.messages[0].content : '';
-      const time = room.messages.length > 0 ? room.messages[0].createdAt : room.updatedAt;
-
-      const unreadCount = 0;
+      const avatar = otherPersonName.substring(0, 2).toUpperCase() || "U";
 
       return {
         id: room.id,
         name: otherPersonName,
-        lastMsg,
-        time,
-        unread: unreadCount,
+        lastMsg: room.lastMessageContent ?? "",
+        time: room.lastMessageAt ?? room.updatedAt,
+        unread: isUserSide ? room.userUnreadCount : room.workerUnreadCount,
         avatar,
-        avatarBg: isUserSide ? '#00A884' : '#0367da',
+        avatarBg: isUserSide ? "#00A884" : "#0367da",
         workerId: room.workerId,
         workerUserId: room.worker.userId,
+        peerUserId: isUserSide ? room.worker.userId : room.userId,
+        blockedBy: room.blockedBy ?? null,
       };
     });
-
-    formattedRooms.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
     return res.status(200).json({
       success: true,
       statusCode: 200,
       message: "Chat rooms fetched successfully",
-      data: formattedRooms,
+      data,
     });
-  } catch (error: any) {
+  } catch (error) {
     next(error);
   }
 };
@@ -84,7 +114,7 @@ export const getRoomMessages = async (
   next: NextFunction
 ) => {
   try {
-    const user = (req as Request & { user?: { userId: string } }).user;
+    const user = getViewer(req);
     if (!user?.userId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
@@ -96,45 +126,276 @@ export const getRoomMessages = async (
       return res.status(400).json({ success: false, message: "Room id required" });
     }
 
-    const room = await prisma.chatRoom.findUnique({
-      where: { id: roomId },
-    });
-
+    const room = await getRoomParticipants(roomId);
     if (!room) {
       return res.status(404).json({ success: false, message: "Chat room not found" });
     }
-
-    const workerRow = await prisma.worker.findUnique({
-      where: { id: room.workerId },
-      select: { userId: true },
-    });
-
-    if (!workerRow) {
-      return res.status(404).json({ success: false, message: "Worker not found" });
-    }
-
-    const participant =
-      user.userId === room.userId || user.userId === workerRow.userId;
-    if (!participant) {
+    if (user.userId !== room.userId && user.userId !== room.workerUserId) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
-    if (room.userId === workerRow.userId) {
-      return res.status(404).json({ success: false, message: "Chat room not found" });
-    }
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(Math.max(Math.trunc(limitRaw), 1), MAX_PAGE_SIZE)
+      : DEFAULT_PAGE_SIZE;
 
-    const messages = await prisma.chatMessage.findMany({
-      where: { roomId: room.id },
-      orderBy: { createdAt: "asc" },
-    });
+    const cursor = parseCursor(
+      typeof req.query.cursor === "string" ? req.query.cursor : undefined
+    );
+
+    const { items, nextCursor } = await getMessagesPage({ roomId, limit, cursor });
 
     return res.status(200).json({
       success: true,
       statusCode: 200,
       message: "Messages fetched successfully",
-      data: messages,
+      data: {
+        // newest-first from DB; reverse so the client renders oldest -> newest.
+        messages: [...items].reverse(),
+        nextCursor,
+        hasMore: Boolean(nextCursor),
+      },
     });
-  } catch (error: any) {
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /rooms/:roomId/seen — reliable HTTP path to persist read receipts and
+// zero the viewer's unread counter (socket message:seen is best-effort only).
+export const markRoomSeenHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const ctx = await authorizeRoom(req, res);
+    if (!ctx) return;
+
+    const result = await applyRoomSeen(ctx.room.id, ctx.user.userId);
+    if (!result) {
+      return res.status(404).json({ success: false, message: "Chat room not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Room marked as seen",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Resolves the room and authorizes the viewer as a participant. Returns the
+// room (with both user ids + block owner) or sends the appropriate error.
+const authorizeRoom = async (req: Request, res: Response) => {
+  const user = getViewer(req);
+  if (!user?.userId) {
+    res.status(401).json({ success: false, message: "Unauthorized" });
+    return null;
+  }
+  const roomId = getRoomId(req);
+  if (!roomId) {
+    res.status(400).json({ success: false, message: "Room id required" });
+    return null;
+  }
+  const room = await getRoomParticipants(roomId);
+  if (!room) {
+    res.status(404).json({ success: false, message: "Chat room not found" });
+    return null;
+  }
+  if (user.userId !== room.userId && user.userId !== room.workerUserId) {
+    res.status(403).json({ success: false, message: "Forbidden" });
+    return null;
+  }
+  return { user, room };
+};
+
+// DELETE /rooms/:roomId/messages -> hard-delete every message (clear chat).
+export const clearChat = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const ctx = await authorizeRoom(req, res);
+    if (!ctx) return;
+    const { room } = ctx;
+
+    // Guard the delete/clear-then-late-save race before wiping the table.
+    markRoomCleared(room.id);
+    await clearRoomMessages(room.id);
+
+    broadcastToRoom<ChatClearedEvent>(
+      room.id,
+      room,
+      SOCKET_EVENTS.CHAT_CLEARED,
+      { roomId: room.id }
+    );
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Chat cleared successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DELETE /rooms/:roomId/messages/:messageId -> hard-delete one message.
+export const deleteMessage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const ctx = await authorizeRoom(req, res);
+    if (!ctx) return;
+    const { room } = ctx;
+
+    const messageId = getMessageId(req);
+    if (!messageId) {
+      return res.status(400).json({ success: false, message: "Message id required" });
+    }
+
+    markMessageDeleted(messageId);
+    await deleteMessageById(room.id, messageId);
+
+    broadcastToRoom<MessageDeletedEvent>(
+      room.id,
+      room,
+      SOCKET_EVENTS.MESSAGE_DELETED,
+      { roomId: room.id, messageId }
+    );
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Message deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PATCH /rooms/:roomId/messages/:messageId -> edit message content (sender only).
+export const editMessage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const ctx = await authorizeRoom(req, res);
+    if (!ctx) return;
+    const { user, room } = ctx;
+
+    const messageId = getMessageId(req);
+    if (!messageId) {
+      return res.status(400).json({ success: false, message: "Message id required" });
+    }
+
+    const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
+    if (!content) {
+      return res.status(400).json({ success: false, message: "Content required" });
+    }
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({ success: false, message: "Content too long" });
+    }
+
+    const result = await editMessageById(room.id, messageId, user.userId, content);
+    if (!result.ok) {
+      const status = result.error === "forbidden" ? 403 : 404;
+      return res
+        .status(status)
+        .json({ success: false, message: result.error === "forbidden" ? "Forbidden" : "Message not found" });
+    }
+
+    broadcastToRoom<MessageEditedEvent>(
+      room.id,
+      room,
+      SOCKET_EVENTS.MESSAGE_EDITED,
+      { roomId: room.id, messageId, content }
+    );
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Message edited successfully",
+      data: { content },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /rooms/:roomId/block -> block the conversation (viewer becomes owner).
+export const blockChat = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const ctx = await authorizeRoom(req, res);
+    if (!ctx) return;
+    const { user, room } = ctx;
+
+    await setRoomBlockedBy(room.id, user.userId);
+    setRoomBlock(room.id, user.userId);
+
+    broadcastToRoom<ChatBlockUpdateEvent>(
+      room.id,
+      room,
+      SOCKET_EVENTS.CHAT_BLOCK_UPDATE,
+      { roomId: room.id, blockedBy: user.userId }
+    );
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Contact blocked",
+      data: { blockedBy: user.userId },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /rooms/:roomId/unblock -> only the participant who blocked may unblock.
+export const unblockChat = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const ctx = await authorizeRoom(req, res);
+    if (!ctx) return;
+    const { user, room } = ctx;
+
+    if (room.blockedBy && room.blockedBy !== user.userId) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Only the blocker can unblock" });
+    }
+
+    await setRoomBlockedBy(room.id, null);
+    setRoomBlock(room.id, null);
+
+    broadcastToRoom<ChatBlockUpdateEvent>(
+      room.id,
+      room,
+      SOCKET_EVENTS.CHAT_BLOCK_UPDATE,
+      { roomId: room.id, blockedBy: null }
+    );
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Contact unblocked",
+      data: { blockedBy: null },
+    });
+  } catch (error) {
     next(error);
   }
 };

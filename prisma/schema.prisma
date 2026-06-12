@@ -83,6 +83,15 @@ enum PaymentMethod {
   @@schema("commerce")
 }
 
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  SEEN
+
+  @@schema("public")
+}
+
 model User {
   id                 String    @id
   mobile             String    @unique
@@ -277,6 +286,21 @@ model ChatRoom {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Denormalized conversation preview, kept up to date by the message-save
+  // worker so the rooms list is a single indexed read (no per-room join).
+  lastMessageId      String?
+  lastMessageContent String?
+  lastMessageSenderId String?
+  lastMessageAt      DateTime?
+
+  // Per-side unread counters maintained asynchronously by the status worker.
+  userUnreadCount   Int @default(0)
+  workerUnreadCount Int @default(0)
+
+  // Userid of the participant who blocked the conversation. Null = not blocked.
+  // While set, neither side may send into the room.
+  blockedBy String?
+
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   worker   Worker        @relation(fields: [workerId], references: [id], onDelete: Cascade)
   messages ChatMessage[]
@@ -284,21 +308,29 @@ model ChatRoom {
   @@unique([userId, workerId])
   @@index([userId])
   @@index([workerId])
+  @@index([lastMessageAt(sort: Desc)])
   @@map("chat_room")
   @@schema("public")
 }
 
 model ChatMessage {
-  id        String   @id
-  roomId    String
-  senderId  String
-  content   String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String        @id
+  roomId      String
+  senderId    String
+  receiverId  String
+  content     String
+  status      MessageStatus @default(SENT)
+  deliveredAt DateTime?
+  seenAt      DateTime?
+  createdAt   DateTime      @default(now())
 
   room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@index([roomId])
+  @@index([roomId, createdAt(sort: Desc)])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+  @@index([receiverId, status])
   @@map("chat_message")
   @@schema("public")
 }
