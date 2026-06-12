@@ -1,5 +1,17 @@
 import { Request, Response, NextFunction } from "express";
-import prisma from "../../config/db.conn";
+
+import {
+  listRoomsForViewer,
+  getRoomParticipants,
+  getMessagesPage,
+  parseCursor,
+} from "../../repositories/chat.repository";
+
+const MAX_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 30;
+
+const getViewer = (req: Request) =>
+  (req as Request & { user?: { userId: string } }).user;
 
 export const getChatRooms = async (
   req: Request,
@@ -7,73 +19,45 @@ export const getChatRooms = async (
   next: NextFunction
 ) => {
   try {
-    const user = (req as Request & { user?: { userId: string } }).user;
+    const user = getViewer(req);
     if (!user?.userId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const userId = user.userId;
+    const rooms = await listRoomsForViewer(user.userId);
 
-    const worker = await prisma.worker.findFirst({ where: { userId } });
-
-    const rooms = await prisma.chatRoom.findMany({
-      where: worker
-        ? {
-            OR: [{ userId }, { workerId: worker.id }],
-          }
-        : { userId },
-      include: {
-        user: true,
-        worker: {
-          include: { user: true }
-        },
-        messages: {
-          orderBy: { createdAt: "desc" },
-          take: 1
-        }
-      }
-    });
-
-    const visibleRooms = rooms.filter(
-      (room) => room.userId !== room.worker.userId && room.messages.length > 0
-    );
-
-    const formattedRooms = visibleRooms.map((room) => {
-      const isUserSide = room.userId === userId;
+    const data = rooms.map((room) => {
+      const isUserSide = room.userId === user.userId;
 
       const otherPersonName = isUserSide
-        ? `${room.worker.user.firstName || ''} ${room.worker.user.lastName || ''}`.trim() || room.worker.mobile
-        : `${room.user.firstName || ''} ${room.user.lastName || ''}`.trim() || room.user.mobile;
+        ? `${room.worker.user.firstName || ""} ${room.worker.user.lastName || ""}`.trim() ||
+          room.worker.mobile
+        : `${room.user.firstName || ""} ${room.user.lastName || ""}`.trim() ||
+          room.user.mobile;
 
-      const avatar = otherPersonName.substring(0, 2).toUpperCase() || 'U';
-
-      const lastMsg = room.messages.length > 0 ? room.messages[0].content : '';
-      const time = room.messages.length > 0 ? room.messages[0].createdAt : room.updatedAt;
-
-      const unreadCount = 0;
+      const avatar = otherPersonName.substring(0, 2).toUpperCase() || "U";
 
       return {
         id: room.id,
         name: otherPersonName,
-        lastMsg,
-        time,
-        unread: unreadCount,
+        lastMsg: room.lastMessageContent ?? "",
+        time: room.lastMessageAt ?? room.updatedAt,
+        unread: isUserSide ? room.userUnreadCount : room.workerUnreadCount,
         avatar,
-        avatarBg: isUserSide ? '#00A884' : '#0367da',
+        avatarBg: isUserSide ? "#00A884" : "#0367da",
         workerId: room.workerId,
         workerUserId: room.worker.userId,
+        peerUserId: isUserSide ? room.worker.userId : room.userId,
       };
     });
-
-    formattedRooms.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
     return res.status(200).json({
       success: true,
       statusCode: 200,
       message: "Chat rooms fetched successfully",
-      data: formattedRooms,
+      data,
     });
-  } catch (error: any) {
+  } catch (error) {
     next(error);
   }
 };
@@ -84,7 +68,7 @@ export const getRoomMessages = async (
   next: NextFunction
 ) => {
   try {
-    const user = (req as Request & { user?: { userId: string } }).user;
+    const user = getViewer(req);
     if (!user?.userId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
@@ -96,45 +80,37 @@ export const getRoomMessages = async (
       return res.status(400).json({ success: false, message: "Room id required" });
     }
 
-    const room = await prisma.chatRoom.findUnique({
-      where: { id: roomId },
-    });
-
+    const room = await getRoomParticipants(roomId);
     if (!room) {
       return res.status(404).json({ success: false, message: "Chat room not found" });
     }
-
-    const workerRow = await prisma.worker.findUnique({
-      where: { id: room.workerId },
-      select: { userId: true },
-    });
-
-    if (!workerRow) {
-      return res.status(404).json({ success: false, message: "Worker not found" });
-    }
-
-    const participant =
-      user.userId === room.userId || user.userId === workerRow.userId;
-    if (!participant) {
+    if (user.userId !== room.userId && user.userId !== room.workerUserId) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
-    if (room.userId === workerRow.userId) {
-      return res.status(404).json({ success: false, message: "Chat room not found" });
-    }
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(Math.max(Math.trunc(limitRaw), 1), MAX_PAGE_SIZE)
+      : DEFAULT_PAGE_SIZE;
 
-    const messages = await prisma.chatMessage.findMany({
-      where: { roomId: room.id },
-      orderBy: { createdAt: "asc" },
-    });
+    const cursor = parseCursor(
+      typeof req.query.cursor === "string" ? req.query.cursor : undefined
+    );
+
+    const { items, nextCursor } = await getMessagesPage({ roomId, limit, cursor });
 
     return res.status(200).json({
       success: true,
       statusCode: 200,
       message: "Messages fetched successfully",
-      data: messages,
+      data: {
+        // newest-first from DB; reverse so the client renders oldest -> newest.
+        messages: [...items].reverse(),
+        nextCursor,
+        hasMore: Boolean(nextCursor),
+      },
     });
-  } catch (error: any) {
+  } catch (error) {
     next(error);
   }
 };
