@@ -297,6 +297,11 @@ model ChatRoom {
   userUnreadCount   Int @default(0)
   workerUnreadCount Int @default(0)
 
+  // Per-side "delete chat" watermark. Room hidden for that participant until a
+  // newer message arrives (then the hidden flag is cleared on persist).
+  userHiddenAt   DateTime?
+  workerHiddenAt DateTime?
+
   // Userid of the participant who blocked the conversation. Null = not blocked.
   // While set, neither side may send into the room.
   blockedBy String?
@@ -325,6 +330,7 @@ model ChatMessage {
   createdAt   DateTime      @default(now())
 
   room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  hiddenFor ChatMessageHidden[]
 
   @@index([roomId, createdAt(sort: Desc)])
   @@index([senderId])
@@ -332,6 +338,20 @@ model ChatMessage {
   @@index([createdAt])
   @@index([receiverId, status])
   @@map("chat_message")
+  @@schema("public")
+}
+
+model ChatMessageHidden {
+  id        String   @id
+  messageId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@map("chat_message_hidden")
   @@schema("public")
 }
 

@@ -7,6 +7,7 @@ import {
   markRoomSeenHandler,
   clearChat,
   deleteMessage,
+  hideChatRoom,
   editMessage,
   blockChat,
   unblockChat,
@@ -17,6 +18,7 @@ const router = express.Router();
 router.get("/rooms/:roomId/messages", chatsRateLimit, verifyToken, getRoomMessages);
 router.post("/rooms/:roomId/seen", chatsRateLimit, verifyToken, markRoomSeenHandler);
 router.get("/rooms", chatsRateLimit, verifyToken, getChatRooms);
+router.delete("/rooms/:roomId", chatsRateLimit, verifyToken, hideChatRoom);
 
 router.delete("/rooms/:roomId/messages/:messageId", chatsRateLimit, verifyToken, deleteMessage);
 router.patch("/rooms/:roomId/messages/:messageId", chatsRateLimit, verifyToken, editMessage);
