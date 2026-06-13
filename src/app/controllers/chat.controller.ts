@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 
+import prisma from "../../config/db.conn";
 import { applyRoomSeen } from "../chat/applyRoomSeen";
 import {
   listRoomsForViewer,
@@ -7,6 +8,8 @@ import {
   getMessagesPage,
   parseCursor,
   deleteMessageById,
+  hideMessageForUser,
+  hideRoomForViewer,
   editMessageById,
   clearRoomMessages,
   setRoomBlockedBy,
@@ -20,6 +23,7 @@ import {
 import {
   SOCKET_EVENTS,
   type MessageDeletedEvent,
+  type MessageHiddenEvent,
   type MessageEditedEvent,
   type ChatClearedEvent,
   type ChatBlockUpdateEvent,
@@ -143,7 +147,12 @@ export const getRoomMessages = async (
       typeof req.query.cursor === "string" ? req.query.cursor : undefined
     );
 
-    const { items, nextCursor } = await getMessagesPage({ roomId, limit, cursor });
+    const { items, nextCursor } = await getMessagesPage({
+      roomId,
+      viewerUserId: user.userId,
+      limit,
+      cursor,
+    });
 
     return res.status(200).json({
       success: true,
@@ -244,7 +253,9 @@ export const clearChat = async (
   }
 };
 
-// DELETE /rooms/:roomId/messages/:messageId -> hard-delete one message.
+// DELETE /rooms/:roomId/messages/:messageId
+// ?scope=me       -> hide for requester only (delete for me)
+// ?scope=everyone -> hard-delete for both (sender only)
 export const deleteMessage = async (
   req: Request,
   res: Response,
@@ -253,27 +264,106 @@ export const deleteMessage = async (
   try {
     const ctx = await authorizeRoom(req, res);
     if (!ctx) return;
-    const { room } = ctx;
+    const { user, room } = ctx;
 
     const messageId = getMessageId(req);
     if (!messageId) {
       return res.status(400).json({ success: false, message: "Message id required" });
     }
 
+    const scope =
+      typeof req.query.scope === "string" ? req.query.scope.trim().toLowerCase() : "everyone";
+
+    if (scope === "me") {
+      const result = await hideMessageForUser(room.id, messageId, user.userId);
+      if (!result.ok) {
+        return res.status(404).json({ success: false, message: "Message not found" });
+      }
+
+      getIO()
+        .to(userRoom(user.userId))
+        .emit(SOCKET_EVENTS.MESSAGE_HIDDEN, {
+          roomId: room.id,
+          messageId,
+          userId: user.userId,
+        } satisfies MessageHiddenEvent);
+
+      return res.status(200).json({
+        success: true,
+        statusCode: 200,
+        message: "Message deleted for you",
+      });
+    }
+
+    if (scope !== "everyone") {
+      return res.status(400).json({ success: false, message: "Invalid scope" });
+    }
+
+    const message = await prisma.chatMessage.findFirst({
+      where: { id: messageId, roomId: room.id },
+      select: { senderId: true },
+    });
+    if (!message) {
+      return res.status(404).json({ success: false, message: "Message not found" });
+    }
+    if (message.senderId !== user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the sender can delete for everyone",
+      });
+    }
+
     markMessageDeleted(messageId);
-    await deleteMessageById(room.id, messageId);
+    const deleted = await deleteMessageById(room.id, messageId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Message not found" });
+    }
 
     broadcastToRoom<MessageDeletedEvent>(
       room.id,
       room,
       SOCKET_EVENTS.MESSAGE_DELETED,
-      { roomId: room.id, messageId }
+      {
+        roomId: room.id,
+        messageId,
+        receiverId: deleted.receiverId,
+        wasUnread: deleted.wasUnread,
+        lastMsg: deleted.lastMsg,
+        time: deleted.time,
+        receiverUnread: deleted.receiverUnread,
+      }
     );
 
     return res.status(200).json({
       success: true,
       statusCode: 200,
-      message: "Message deleted successfully",
+      message: "Message deleted for everyone",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DELETE /rooms/:roomId -> hide conversation for requester only.
+export const hideChatRoom = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const ctx = await authorizeRoom(req, res);
+    if (!ctx) return;
+    const { user, room } = ctx;
+
+    const participants = await hideRoomForViewer(room.id, user.userId);
+    if (!participants) {
+      return res.status(404).json({ success: false, message: "Chat room not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Chat deleted for you",
     });
   } catch (error) {
     next(error);

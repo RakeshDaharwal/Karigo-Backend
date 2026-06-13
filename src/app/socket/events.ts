@@ -14,6 +14,7 @@ export const SOCKET_EVENTS = {
   MESSAGE_NEW: "message:new",
   MESSAGE_STATUS: "message:status",
   MESSAGE_DELETED: "message:deleted",
+  MESSAGE_HIDDEN: "message:hidden",
   MESSAGE_EDITED: "message:edited",
   CHAT_CLEARED: "chat:cleared",
   CHAT_BLOCK_UPDATE: "chat:block:update",
@@ -75,7 +76,16 @@ export type TypingEvent = { roomId: string; userId: string; typing: boolean };
 
 export type PresenceUpdateEvent = { roomId: string; userId: string; online: boolean };
 
-export type MessageDeletedEvent = { roomId: string; messageId: string };
+export type MessageDeletedEvent = {
+  roomId: string;
+  messageId: string;
+  receiverId: string;
+  wasUnread: boolean;
+  lastMsg: string;
+  time: string | null;
+  receiverUnread: number;
+};
+export type MessageHiddenEvent = { roomId: string; messageId: string; userId: string };
 export type MessageEditedEvent = {
   roomId: string;
   messageId: string;

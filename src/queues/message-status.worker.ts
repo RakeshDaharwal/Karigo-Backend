@@ -22,7 +22,6 @@ export const createMessageStatusWorker = () => {
       if (data.type === "delivered") {
         const res = await markMessageDelivered(data.messageId);
         if (res.count > 0) {
-          // Notify the sender only; their outgoing message was delivered.
           emitToUser(data.senderUserId, {
             roomId: data.roomId,
             status: MessageStatus.DELIVERED,

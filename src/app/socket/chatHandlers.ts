@@ -120,16 +120,20 @@ export const registerChatHandlers = (socket: Socket, io: Server) => {
     }
   );
 
-  socket.on(SOCKET_EVENTS.CHAT_LEAVE, (payload: ChatLeavePayload) => {
-    if (!payload?.roomId) return;
-    const room = chatRoom(payload.roomId);
-    socket.to(room).emit(SOCKET_EVENTS.PRESENCE_UPDATE, {
-      roomId: payload.roomId,
-      userId,
-      online: false,
-    });
-    socket.leave(room);
-  });
+  socket.on(
+    SOCKET_EVENTS.CHAT_LEAVE,
+    async (payload: ChatLeavePayload, cb: unknown) => {
+      if (!payload?.roomId) return;
+      const room = chatRoom(payload.roomId);
+      socket.to(room).emit(SOCKET_EVENTS.PRESENCE_UPDATE, {
+        roomId: payload.roomId,
+        userId,
+        online: false,
+      });
+      await socket.leave(room);
+      callAck(cb, { ok: true });
+    }
+  );
 
   // --- hot path: no PostgreSQL access, deliver + ack + enqueue ---
   socket.on(
