@@ -68,6 +68,7 @@ type PersistMessageInput = {
   receiverId: string;
   content: string;
   createdAt: Date;
+  receiverInRoom?: boolean;
 };
 
 // Idempotent persist (safe under BullMQ retries) + denormalized room preview
@@ -78,20 +79,21 @@ export const persistMessage = (input: PersistMessageInput) =>
     // hard-deleted (or whose room was cleared) before its save job ran must not
     // be resurrected.
     if (isMessageDeleted(input.id) || isClearedAfter(input.roomId, input.createdAt)) {
-      return;
+      return { created: false };
     }
 
     const existing = await tx.chatMessage.findUnique({
       where: { id: input.id },
       select: { id: true },
     });
-    if (existing) return;
+    if (existing) return { created: false };
 
-    // The receiver may have already read this message (chat open) before its
-    // save job ran. Settle it as SEEN and skip the unread bump so the persisted
-    // state matches what both clients already show, even if the reader has
-    // since left the room and presence no longer reports them in it.
-    const alreadySeen = isRoomSeenAfter(input.roomId, input.receiverId, input.createdAt);
+    // Only settle as SEEN from the in-memory watermark when the receiver still
+    // has this chat open. A past read session must not auto-read new messages
+    // after they leave the room (those should become DELIVERED or stay SENT).
+    const alreadySeen =
+      Boolean(input.receiverInRoom) &&
+      isRoomSeenAfter(input.roomId, input.receiverId, input.createdAt);
 
     await tx.chatMessage.create({
       data: {
@@ -110,7 +112,7 @@ export const persistMessage = (input: PersistMessageInput) =>
       where: { id: input.roomId },
       select: { userId: true },
     });
-    if (!room) return;
+    if (!room) return { created: true };
 
     const receiverIsCustomer = input.receiverId === room.userId;
     const unreadBump = alreadySeen
@@ -127,8 +129,13 @@ export const persistMessage = (input: PersistMessageInput) =>
         lastMessageSenderId: input.senderId,
         lastMessageAt: input.createdAt,
         ...unreadBump,
+        ...(receiverIsCustomer
+          ? { userHiddenAt: null }
+          : { workerHiddenAt: null }),
       },
     });
+
+    return { created: true };
   });
 
 export const markMessageDelivered = (messageId: string) =>
@@ -185,17 +192,44 @@ export const deleteMessageById = async (roomId: string, messageId: string) => {
   });
   if (!room) return null;
 
-  await prisma.$transaction(async (tx) => {
-    const deleted = await tx.chatMessage.deleteMany({
+  type DeletedMeta = {
+    receiverId: string;
+    wasUnread: boolean;
+    lastMsg: string;
+    time: string | null;
+    receiverUnread: number;
+  };
+
+  const deletedMeta = await prisma.$transaction(async (tx): Promise<DeletedMeta | null> => {
+    const message = await tx.chatMessage.findFirst({
+      where: { id: messageId, roomId },
+      select: { receiverId: true, status: true },
+    });
+    if (!message) return null;
+
+    const wasUnread = message.status !== MessageStatus.SEEN;
+    const receiverIsCustomer = message.receiverId === room.userId;
+
+    await tx.chatMessage.deleteMany({
       where: { id: messageId, roomId },
     });
-    if (deleted.count === 0) return;
 
     const latest = await tx.chatMessage.findFirst({
       where: { roomId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       select: { id: true, content: true, senderId: true, createdAt: true },
     });
+
+    const roomRow = await tx.chatRoom.findUnique({
+      where: { id: roomId },
+      select: { userUnreadCount: true, workerUnreadCount: true },
+    });
+    if (!roomRow) return null;
+
+    const currentUnread = receiverIsCustomer
+      ? roomRow.userUnreadCount
+      : roomRow.workerUnreadCount;
+    const receiverUnread = wasUnread ? Math.max(0, currentUnread - 1) : currentUnread;
 
     await tx.chatRoom.update({
       where: { id: roomId },
@@ -204,8 +238,69 @@ export const deleteMessageById = async (roomId: string, messageId: string) => {
         lastMessageContent: latest?.content ?? null,
         lastMessageSenderId: latest?.senderId ?? null,
         lastMessageAt: latest?.createdAt ?? null,
+        ...(wasUnread
+          ? receiverIsCustomer
+            ? { userUnreadCount: receiverUnread }
+            : { workerUnreadCount: receiverUnread }
+          : {}),
       },
     });
+
+    return {
+      receiverId: message.receiverId,
+      wasUnread,
+      lastMsg: latest?.content ?? "",
+      time: latest?.createdAt?.toISOString() ?? null,
+      receiverUnread,
+    };
+  });
+
+  if (!deletedMeta) return null;
+
+  return {
+    userId: room.userId,
+    workerUserId: room.worker.userId,
+    ...deletedMeta,
+  };
+};
+
+// Soft-hide a message for one participant only (delete for me).
+export const hideMessageForUser = async (
+  roomId: string,
+  messageId: string,
+  userId: string
+) => {
+  const message = await prisma.chatMessage.findFirst({
+    where: { id: messageId, roomId },
+    select: { id: true },
+  });
+  if (!message) return { ok: false as const, error: "not_found" };
+
+  await prisma.chatMessageHidden.upsert({
+    where: { messageId_userId: { messageId, userId } },
+    create: { id: ulid(), messageId, userId },
+    update: {},
+  });
+
+  return { ok: true as const };
+};
+
+// Hides the entire conversation for one participant (delete chat for me only).
+export const hideRoomForViewer = async (roomId: string, viewerUserId: string) => {
+  const room = await prisma.chatRoom.findUnique({
+    where: { id: roomId },
+    select: { userId: true, worker: { select: { userId: true } } },
+  });
+  if (!room) return null;
+
+  const isUserSide = viewerUserId === room.userId;
+  const isWorkerSide = viewerUserId === room.worker.userId;
+  if (!isUserSide && !isWorkerSide) return null;
+
+  const now = new Date();
+  await prisma.chatRoom.update({
+    where: { id: roomId },
+    data: isUserSide ? { userHiddenAt: now } : { workerHiddenAt: now },
   });
 
   return { userId: room.userId, workerUserId: room.worker.userId };
@@ -311,6 +406,8 @@ export const listRoomsForViewer = async (viewerUserId: string) => {
       lastMessageSenderId: true,
       userUnreadCount: true,
       workerUnreadCount: true,
+      userHiddenAt: true,
+      workerHiddenAt: true,
       blockedBy: true,
       updatedAt: true,
       user: {
@@ -327,11 +424,20 @@ export const listRoomsForViewer = async (viewerUserId: string) => {
     },
   });
 
-  return rooms.filter((room) => room.userId !== room.worker.userId);
+  return rooms
+    .filter((room) => room.userId !== room.worker.userId)
+    .filter((room) => {
+      const isUserSide = room.userId === viewerUserId;
+      const hiddenAt = isUserSide ? room.userHiddenAt : room.workerHiddenAt;
+      if (!hiddenAt) return true;
+      if (!room.lastMessageAt) return false;
+      return room.lastMessageAt.getTime() > hiddenAt.getTime();
+    });
 };
 
 export type MessagePageParams = {
   roomId: string;
+  viewerUserId: string;
   limit: number;
   cursor?: { createdAt: Date; id: string };
 };
@@ -340,12 +446,14 @@ export type MessagePageParams = {
 // plus the cursor for the next (older) page. No OFFSET.
 export const getMessagesPage = async ({
   roomId,
+  viewerUserId,
   limit,
   cursor,
 }: MessagePageParams) => {
   const rows = await prisma.chatMessage.findMany({
     where: {
       roomId,
+      hiddenFor: { none: { userId: viewerUserId } },
       ...(cursor
         ? {
             OR: [

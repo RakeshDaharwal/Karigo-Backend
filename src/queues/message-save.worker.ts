@@ -1,11 +1,12 @@
 import { Worker } from "bullmq";
 
 import { bullConnection, QUEUE_NAMES } from "../config/bullmq.conn";
-import { persistMessage } from "../repositories/chat.repository";
+import { persistMessage, markMessageDelivered } from "../repositories/chat.repository";
+import { MessageStatus } from "../generated/prisma/enums";
 import { isOnline } from "../app/socket/presence";
-import { isUserInRoom } from "../app/socket/io";
+import { isUserInRoom, getIO, userRoom } from "../app/socket/io";
+import { SOCKET_EVENTS } from "../app/socket/events";
 import {
-  enqueueMessageDelivered,
   enqueueRoomSeen,
   type MessageSaveJob,
 } from "./index";
@@ -16,25 +17,38 @@ export const createMessageSaveWorker = () => {
     QUEUE_NAMES.messageSave,
     async (job) => {
       const data = job.data;
+      const receiverInRoom = await isUserInRoom(data.roomId, data.receiverId);
 
-      await persistMessage({
+      const saved = await persistMessage({
         id: data.id,
         roomId: data.roomId,
         senderId: data.senderId,
         receiverId: data.receiverId,
         content: data.content,
         createdAt: new Date(data.createdAt),
+        receiverInRoom,
       });
 
-      // Message now exists in PostgreSQL. Decide its status from live presence,
-      // independent of queue ordering:
-      //   - receiver actively viewing the room -> SEEN (clears unread)
-      //   - receiver merely online              -> DELIVERED
-      //   - receiver offline                    -> stays SENT
-      if (await isUserInRoom(data.roomId, data.receiverId)) {
+      if (!saved?.created) return;
+
+      if (receiverInRoom) {
         await enqueueRoomSeen(data.roomId, data.receiverId);
-      } else if (isOnline(data.receiverId)) {
-        await enqueueMessageDelivered(data.id, data.roomId, data.senderId);
+        return;
+      }
+
+      if (!isOnline(data.receiverId)) return;
+
+      const res = await markMessageDelivered(data.id);
+      if (res.count > 0) {
+        try {
+          getIO().to(userRoom(data.senderId)).emit(SOCKET_EVENTS.MESSAGE_STATUS, {
+            roomId: data.roomId,
+            status: MessageStatus.DELIVERED,
+            messageId: data.id,
+          });
+        } catch {
+          // Socket not ready; DB write above still stands.
+        }
       }
     },
     { connection: bullConnection, concurrency: 10 }
