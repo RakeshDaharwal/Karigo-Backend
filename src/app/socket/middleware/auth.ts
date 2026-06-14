@@ -2,7 +2,7 @@ import { type Socket } from "socket.io";
 import { type ExtendedError } from "socket.io";
 import jwt from "jsonwebtoken";
 
-import { Role } from "../../generated/prisma/enums";
+import { Role } from "../../../generated/prisma/enums";
 
 export type AuthedSocketData = {
   userId: string;
