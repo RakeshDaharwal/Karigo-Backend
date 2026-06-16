@@ -3,8 +3,9 @@ import { Worker } from "bullmq";
 import { bullConnection, QUEUE_NAMES } from "../config/bullmq.conn";
 import { persistMessage, markMessageDelivered } from "../repositories/chat.repository";
 import { MessageStatus } from "../generated/prisma/enums";
-import { isOnline } from "../app/socket/presence";
-import { isUserInRoom, getIO, userRoom } from "../app/socket/io";
+import { isOnline } from "../app/socket/presence/presence";
+import { getIO } from "../app/socket/io";
+import { isUserInRoom, userRoom } from "../app/socket/rooms";
 import { SOCKET_EVENTS } from "../app/socket/events";
 import {
   enqueueRoomSeen,

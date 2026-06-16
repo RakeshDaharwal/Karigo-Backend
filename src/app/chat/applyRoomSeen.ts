@@ -1,7 +1,8 @@
 import { MessageStatus } from "../../generated/prisma/enums";
 import { markRoomSeen } from "../../repositories/chat.repository";
 import { markRoomSeenAt } from "../socket/chatRuntimeState";
-import { getIO, userRoom } from "../socket/io";
+import { getIO } from "../socket/io";
+import { userRoom } from "../socket/rooms";
 import { SOCKET_EVENTS } from "../socket/events";
 
 // Single authoritative path for persisting "reader opened / read this room":
