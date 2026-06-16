@@ -14,7 +14,8 @@ import {
   clearRoomMessages,
   setRoomBlockedBy,
 } from "../../repositories/chat.repository";
-import { getIO, userRoom, chatRoom } from "../socket/io";
+import { getIO } from "../socket/io";
+import { userRoom, chatRoom } from "../socket/rooms";
 import {
   markMessageDeleted,
   markRoomCleared,
@@ -85,6 +86,9 @@ export const getChatRooms = async (
           room.user.mobile;
 
       const avatar = otherPersonName.substring(0, 2).toUpperCase() || "U";
+      const peerAvatar = isUserSide
+        ? room.worker.profileImage
+        : room.user.profileImage;
 
       return {
         id: room.id,
@@ -94,6 +98,7 @@ export const getChatRooms = async (
         unread: isUserSide ? room.userUnreadCount : room.workerUnreadCount,
         avatar,
         avatarBg: isUserSide ? "#00A884" : "#0367da",
+        peerAvatar: peerAvatar ?? null,
         workerId: room.workerId,
         workerUserId: room.worker.userId,
         peerUserId: isUserSide ? room.worker.userId : room.userId,

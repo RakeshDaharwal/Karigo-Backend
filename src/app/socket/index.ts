@@ -1,11 +1,11 @@
 import { type Server } from "socket.io";
 
 import { setIO } from "./io";
-import { socketAuthMiddleware } from "./socketAuth";
-import { registerChatHandlers } from "./chatHandlers";
+import { socketAuthMiddleware } from "./middleware/auth";
+import { registerHandlers } from "./registerHandlers";
 
 export const initChatSocket = (io: Server) => {
   setIO(io);
   io.use(socketAuthMiddleware);
-  io.on("connection", (socket) => registerChatHandlers(socket, io));
+  io.on("connection", (socket) => registerHandlers(socket, io));
 };
